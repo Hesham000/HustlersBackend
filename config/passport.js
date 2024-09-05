@@ -6,44 +6,57 @@ const jwt = require('jsonwebtoken');
 // Load environment variables
 require('dotenv').config();
 
-// Configure the Google strategy for use by Passport.
-passport.use(new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID,         // Your Google Client ID
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET, // Your Google Client Secret
-    callbackURL: '/api/auth/google/callback',       // Callback URL after Google authentication
-}, async (accessToken, refreshToken, profile, done) => {
-    try {
-        // Look for an existing user with the Google ID
-        let user = await User.findOne({ googleId: profile.id });
+// Helper function to generate JWT token
+const generateJwtToken = (userId) => {
+    return jwt.sign(
+        { id: userId },
+        process.env.JWT_SECRET,
+        { expiresIn: '30d' } // Token expires in 30 days
+    );
+};
 
-        if (!user) {
-            // If the user doesn't exist, create a new one
-            user = await User.create({
-                googleId: profile.id,
-                email: profile.emails[0].value,
-                name: profile.displayName,
-            });
+// Configure the Google OAuth strategy
+passport.use(
+    new GoogleStrategy(
+        {
+            clientID: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+            callbackURL: process.env.GOOGLE_CALLBACK_URL,
+        },
+        async (accessToken, refreshToken, profile, done) => {
+            try {
+                let user = await User.findOne({ googleId: profile.id });
+
+                if (user) {
+                    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+                    return done(null, { user, token });
+                }
+
+                user = await User.create({
+                    googleId: profile.id,
+                    email: profile.emails[0].value,
+                    name: profile.displayName,
+                    isVerified: true,
+                });
+
+                const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+                return done(null, { user, token });
+            } catch (err) {
+                return done(err, false);
+            }
         }
+    )
+);
 
-        // Generate a JWT token for the authenticated user
-        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-            expiresIn: '30d',
-        });
-
-        // Pass the user and token to the done callback
-        return done(null, { user, token });
-    } catch (err) {
-        // Handle errors during the authentication process
-        return done(err, false);
-    }
-}));
 
 // Serialize user information into the session
-passport.serializeUser((user, done) => {
-    done(null, user);
+passport.serializeUser((data, done) => {
+    done(null, data);
 });
 
 // Deserialize user information from the session
 passport.deserializeUser((obj, done) => {
     done(null, obj);
 });
+
+module.exports = passport;

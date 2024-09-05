@@ -4,10 +4,7 @@ const fs = require('fs');
 
 // Add a new package
 exports.addPackage = async (req, res) => {
-    console.log('req.file:', req.file); // Debugging line
-    console.log('req.body:', req.body); // Debugging line
     const { title, description, price } = req.body;
-
 
     try {
         const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
@@ -24,7 +21,6 @@ exports.addPackage = async (req, res) => {
         res.status(400).json({ success: false, error: err.message });
     }
 };
-
 // Get all packages
 exports.getPackages = async (req, res) => {
     try {

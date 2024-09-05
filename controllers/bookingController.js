@@ -3,8 +3,9 @@ const Booking = require('../models/Booking');
 // Create a Booking
 exports.createBooking = async (req, res) => {
     const { user, package, bookingDate } = req.body;
+
     try {
-        const newBooking = await Booking.create({ user, package, bookingDate, status: 'pending' });
+        const newBooking = await Booking.create({ user, package, bookingDate });
         res.status(201).json({ success: true, data: newBooking });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
