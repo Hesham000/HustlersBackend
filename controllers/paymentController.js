@@ -28,21 +28,35 @@ exports.createPayment = async (req, res) => {
     const { user, package, amount, status = 'pending', transactionId, paymentMethod } = req.body;
 
     try {
+        // Check if user exists
+        const userExists = await User.findById(user);
+        if (!userExists) {
+            return res.status(404).json({ success: false, error: 'User not found' });
+        }
+
+        // Check if package exists
+        const packageExists = await Package.findById(package);
+        if (!packageExists) {
+            return res.status(404).json({ success: false, error: 'Package not found' });
+        }
+
+        // Create the payment record
         const newPayment = await Payment.create({
             user,
             package,
             amount,
-            status,  // Default status is 'pending'
+            status,
             transactionId,
-            paymentMethod
+            paymentMethod,
         });
 
         res.status(201).json({ success: true, data: newPayment });
     } catch (err) {
         console.error('Error creating payment:', err.message);
-        res.status(400).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: 'Server error. Please try again later.' });
     }
 };
+
 
 // Retrieve all payments
 exports.getPayments = async (req, res) => {
