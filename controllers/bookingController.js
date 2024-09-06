@@ -5,7 +5,14 @@ exports.createBooking = async (req, res) => {
     const { user, package, bookingDate } = req.body;
 
     try {
-        const newBooking = await Booking.create({ user, package, bookingDate });
+        // Automatically set the status to 'pending' when creating a new booking
+        const newBooking = await Booking.create({
+            user,
+            package,
+            bookingDate,
+            status: 'pending',  // Status defaults to 'pending'
+        });
+
         res.status(201).json({ success: true, data: newBooking });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
@@ -22,21 +29,25 @@ exports.getBookings = async (req, res) => {
     }
 };
 
+
 // Update Booking Status
 exports.updateBookingStatus = async (req, res) => {
     try {
         const booking = await Booking.findByIdAndUpdate(req.params.id, { status: req.body.status }, {
             new: true,
-            runValidators: true,
+            runValidators: true,  // Ensure that the status matches the defined enum
         });
+
         if (!booking) {
             return res.status(404).json({ success: false, error: 'Booking not found' });
         }
+
         res.status(200).json({ success: true, data: booking });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
     }
 };
+
 
 // Delete Booking
 exports.deleteBooking = async (req, res) => {

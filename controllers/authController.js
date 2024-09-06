@@ -16,7 +16,7 @@ const generateToken = (user) => {
 
 // Register User (Email/Password)
 exports.register = async (req, res) => {
-    const { name, email, password } = req.body;
+    const { name, email, password, phone } = req.body; // Include phone
 
     try {
         // Create a new user but do not mark them as verified yet
@@ -24,6 +24,7 @@ exports.register = async (req, res) => {
             name,
             email,
             password,
+            phone,  // Add phone number during registration
             isVerified: false,  // Field to track email verification
         });
 
@@ -68,19 +69,17 @@ exports.verifyEmail = async (req, res) => {
         await user.save();
 
         // Send back a token including the role
-        const token = generateToken(user);
+        const authToken = generateToken(user);
 
         res.status(200).json({
             success: true,
             message: 'Email successfully verified. You are now logged in.',
-            token,  // Send token in response
+            token: authToken,  // Send token in response
         });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
     }
 };
-
-
 
 // Login User (Email/Password)
 exports.login = async (req, res) => {
@@ -104,6 +103,7 @@ exports.login = async (req, res) => {
                 _id: user._id,
                 name: user.name,
                 email: user.email,
+                phone: user.phone,  // Include phone number in response
                 role: user.role,  // Include role
                 token: generateToken(user),
             },
@@ -129,7 +129,6 @@ exports.logout = (req, res) => {
         res.status(400).json({ success: false, error: 'Failed to logout. Please try again.' });
     }
 };
-
 
 // Google OAuth callback
 exports.googleAuthCallback = (req, res) => {

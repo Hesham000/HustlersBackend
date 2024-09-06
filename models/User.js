@@ -21,7 +21,7 @@ const UserSchema = new mongoose.Schema({
     googleId: { 
         type: String, 
         unique: true, 
-        sparse: true // `sparse` ensures that the uniqueness constraint only applies to documents that have the `googleId` field
+        sparse: true 
     },
     role: { 
         type: String, 
@@ -32,30 +32,33 @@ const UserSchema = new mongoose.Schema({
         type: String, 
         default: 'no-photo.jpg' 
     },
+    phone: {
+        type: String, 
+        required: true,  // Make phone required
+        match: [/^\+?[1-9]\d{1,14}$/, 'Please provide a valid phone number']
+    },
     isVerified: { 
         type: Boolean, 
         default: false 
-    },  // Track if the user has verified their email
+    },
     verificationToken: { 
         type: String 
-    },  // Token for email verification
+    },
     verificationExpires: { 
         type: Date 
-    },  // Expiry time for the verification token
+    },
     createdAt: { 
         type: Date, 
         default: Date.now 
-    },  // Timestamp for when the user was created
+    },
 });
 
 // Pre-save middleware to hash the password before saving
 UserSchema.pre('save', async function(next) {
-    // If password is not modified or not present, skip hashing
     if (!this.isModified('password') || !this.password) {
         next();
     }
 
-    // Generate salt and hash the password
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
     next();
