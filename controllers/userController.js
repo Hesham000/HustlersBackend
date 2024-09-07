@@ -59,8 +59,13 @@ exports.updateUser = async (req, res) => {
         // Handle image upload if a file is present
         let imageUrl;
         if (req.file) {
-            const result = await cloudinary.uploader.upload(req.file.path);
-            imageUrl = result.secure_url;  // Store the Cloudinary image URL
+            const result = await cloudinary.uploader.upload(req.file.path, {
+                folder: 'user_images', 
+                use_filename: true,
+                unique_filename: false,
+                overwrite: true
+            });
+            imageUrl = result.secure_url; 
         }
 
         // Find user and update, including the image URL if provided
