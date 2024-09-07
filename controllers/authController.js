@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { sendVerificationEmail } = require('../services/emailService');
 const blacklist = require('../utils/blacklist');
+const { cloudinary } = require('../utils/cloudinary'); // Add cloudinary for image uploads
 
 // Helper function to generate JWT token
 const generateToken = (user) => {
@@ -12,13 +13,13 @@ const generateToken = (user) => {
     }
 
     return jwt.sign(
-        { id: user._id, role: user.role }, // Include user role in token payload
+        { id: user._id, role: user.role },
         process.env.JWT_SECRET,
         { expiresIn: '30d' }
     );
 };
 
-// Register User (Email/Password)
+// Register User (Email/Password + Image Upload)
 exports.register = async (req, res) => {
     const { name, email, password, phone } = req.body;
 
@@ -29,12 +30,25 @@ exports.register = async (req, res) => {
             return res.status(400).json({ success: false, error: 'Email already exists' });
         }
 
-        // Create a new user but do not mark them as verified yet
+        // Handle image upload if present
+        let imageUrl = 'no-photo.jpg'; // Default image
+        if (req.file) {
+            const result = await cloudinary.uploader.upload(req.file.path, {
+                folder: 'user_images',
+                use_filename: true,
+                unique_filename: false,
+                overwrite: true,
+            });
+            imageUrl = result.secure_url; // Get the uploaded image URL from Cloudinary
+        }
+
+        // Create a new user
         const user = await User.create({
             name,
             email,
             password,
             phone,
+            image: imageUrl, // Store the image URL or default
             isVerified: false, // Field to track email verification
         });
 
