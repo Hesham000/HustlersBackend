@@ -1,5 +1,4 @@
 const User = require('../models/User');
-const { uploadToCloudinary, deleteLocalFile } = require('../utils/cloudinary');
 
 // Get All Users
 exports.getUsers = async (req, res) => {
@@ -43,7 +42,7 @@ exports.getUserById = async (req, res) => {
     }
 };
 
-// Create or Update User with Image Upload
+// Create or Update User with Base64 Image Upload
 exports.updateUser = async (req, res) => {
     try {
         const { name, email, phone } = req.body;
@@ -56,20 +55,10 @@ exports.updateUser = async (req, res) => {
             });
         }
 
-        let imageUrl;
+        let imageBase64;
         if (req.file) {
-            // Upload to Cloudinary
-            try {
-                imageUrl = await uploadToCloudinary(req.file.path);
-                // Delete local file after upload
-                deleteLocalFile(req.file.path);
-            } catch (err) {
-                return res.status(500).json({
-                    success: false,
-                    error: 'Image upload failed',
-                    details: err.message
-                });
-            }
+            // Convert image buffer to Base64 string directly from memory (using Multer's memoryStorage)
+            imageBase64 = req.file.buffer.toString('base64');
         }
 
         // Update user with new data
@@ -79,7 +68,7 @@ exports.updateUser = async (req, res) => {
                 name,
                 email,
                 phone,
-                ...(imageUrl && { image: imageUrl })
+                ...(imageBase64 && { image: imageBase64 }) // Update image only if provided
             },
             { new: true, runValidators: true }
         );

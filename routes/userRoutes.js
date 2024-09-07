@@ -1,7 +1,8 @@
 const express = require('express');
 const { getUsers, getUserById, updateUser, deleteUser } = require('../controllers/userController');
 const { protect, restrictTo } = require('../middleware/authMiddleware');
-const { upload } = require('../utils/cloudinary');  // Multer middleware for Cloudinary storage
+const upload = require('../utils/multer');  // Multer middleware for file uploads
+
 const router = express.Router();
 
 // Route to get all users - only accessible by admin users
@@ -14,24 +15,9 @@ router.route('/:id')
     .put(
         protect, 
         restrictTo('admin', 'user'), 
-        (req, res, next) => {
-            // Check if an image file is present before proceeding with upload middleware
-            if (req.file) {
-                upload.single('image')(req, res, (err) => {
-                    if (err) {
-                        return res.status(400).json({
-                            success: false,
-                            error: 'Error uploading image. Please try again.'
-                        });
-                    }
-                    next();
-                });
-            } else {
-                next();  // No image file, proceed to update
-            }
-        },
-        updateUser
-    )  // Admin or user can update, with optional image upload
+        upload.single('image'), // Handle optional image upload with Multer
+        updateUser  // Proceed with user update
+    )
     .delete(protect, restrictTo('admin', 'user'), deleteUser);  // Admin or user can delete a user
 
 module.exports = router;
