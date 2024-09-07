@@ -10,52 +10,34 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Multer configuration for handling file uploads (store files temporarily on disk)
+// Multer setup for handling file uploads locally before uploading to Cloudinary
 const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, 'uploads/');  // Temporary storage before uploading to Cloudinary
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/'); // Save files temporarily to 'uploads/' folder
     },
-    filename: function (req, file, cb) {
-        cb(null, `${Date.now()}-${file.originalname}`);
+    filename: (req, file, cb) => {
+        cb(null, `${Date.now()}_${path.extname(file.originalname)}`);
     }
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({ storage });
 
-// Upload to Cloudinary function
-const uploadToCloudinary = (localFilePath) => {
+// Upload image to Cloudinary
+const uploadToCloudinary = (filePath) => {
     return new Promise((resolve, reject) => {
-        cloudinary.uploader.upload(localFilePath, { folder: 'user_images' }, (error, result) => {
-            if (error) {
-                reject(error);
-            } else {
-                resolve(result);
-            }
-
-            // After uploading, delete the file from the local filesystem
-            fs.unlinkSync(localFilePath);
+        cloudinary.uploader.upload(filePath, (result, error) => {
+            if (error) return reject(error);
+            // Resolve the URL of the uploaded image
+            resolve(result.secure_url);
         });
     });
 };
 
-// Middleware for handling file uploads and Cloudinary upload
-const handleFileUpload = async (req, res, next) => {
-    try {
-        if (!req.file) {
-            return res.status(400).send('No file uploaded.');
-        }
-
-        // Upload the file to Cloudinary
-        const localFilePath = path.join(__dirname, '../uploads/', req.file.filename);
-        const result = await uploadToCloudinary(localFilePath);
-
-        // Attach the Cloudinary result to the request object
-        req.file.cloudinaryUrl = result.secure_url;
-        next();
-    } catch (error) {
-        console.error('Error uploading to Cloudinary:', error.message);
-        res.status(500).send('Error uploading file.');
-    }
+// Helper function to delete the local file after uploading to Cloudinary
+const deleteLocalFile = (filePath) => {
+    fs.unlink(filePath, (err) => {
+        if (err) console.error('Failed to delete local file:', err);
+    });
 };
 
-module.exports = { upload, handleFileUpload };
+module.exports = { upload, uploadToCloudinary, deleteLocalFile };

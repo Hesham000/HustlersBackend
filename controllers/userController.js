@@ -1,5 +1,5 @@
 const User = require('../models/User');
-const { cloudinary } = require('../utils/cloudinary');
+const { uploadToCloudinary, deleteLocalFile } = require('../utils/cloudinary');
 
 // Get All Users
 exports.getUsers = async (req, res) => {
@@ -56,34 +56,35 @@ exports.updateUser = async (req, res) => {
             });
         }
 
-        // Handle image upload if a file is present
         let imageUrl;
         if (req.file) {
-            const result = await cloudinary.uploader.upload(req.file.path, {
-                folder: 'user_images', 
-                use_filename: true,
-                unique_filename: false,
-                overwrite: true
-            });
-            imageUrl = result.secure_url; 
+            // Upload to Cloudinary
+            try {
+                imageUrl = await uploadToCloudinary(req.file.path);
+                // Delete local file after upload
+                deleteLocalFile(req.file.path);
+            } catch (err) {
+                return res.status(500).json({
+                    success: false,
+                    error: 'Image upload failed',
+                    details: err.message
+                });
+            }
         }
 
-        // Find user and update, including the image URL if provided
-        const user = await User.findByIdAndUpdate(
+        // Update user with new data
+        const updatedUser = await User.findByIdAndUpdate(
             req.params.id,
             {
                 name,
                 email,
                 phone,
-                ...(imageUrl && { image: imageUrl })  // Only update image if uploaded
+                ...(imageUrl && { image: imageUrl })
             },
-            {
-                new: true,
-                runValidators: true
-            }
+            { new: true, runValidators: true }
         );
 
-        if (!user) {
+        if (!updatedUser) {
             return res.status(404).json({
                 success: false,
                 error: 'User not found'
@@ -93,8 +94,9 @@ exports.updateUser = async (req, res) => {
         res.status(200).json({
             success: true,
             message: 'User updated successfully',
-            data: user
+            data: updatedUser
         });
+
     } catch (err) {
         res.status(400).json({
             success: false,
