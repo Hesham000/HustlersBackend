@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 
 // Ensure required environment variables are defined
 const requiredEnvVars = ['SMTP_HOST', 'SMTP_PORT', 'EMAIL_USER', 'EMAIL_PASS', 'FROM_EMAIL'];
@@ -21,15 +22,23 @@ const transporter = nodemailer.createTransport({
 });
 
 /**
- * Sends a verification email to the provided email address with a verification URL.
+ * Generates a 6-digit OTP code
+ * @returns {string} - The generated OTP code.
+ */
+const generateOtp = () => {
+    return crypto.randomInt(100000, 999999).toString();  // Generate a 6-digit random OTP
+};
+
+/**
+ * Sends an OTP email to the provided email address.
  * @param {string} email - The recipient's email address.
- * @param {string} verificationUrl - The URL the user clicks to verify their email.
+ * @param {string} otp - The OTP code to be sent for verification.
  * @returns {Promise} - Resolves if email is successfully sent, otherwise throws an error.
  */
-const sendVerificationEmail = async (email, verificationUrl) => {
+const sendVerificationOtp = async (email, otp) => {
     // Validate the required parameters
-    if (!email || !verificationUrl) {
-        const errorMessage = 'Email and verification URL are required.';
+    if (!email || !otp) {
+        const errorMessage = 'Email and OTP are required.';
         console.error(errorMessage);
         throw new Error(errorMessage);
     }
@@ -38,16 +47,15 @@ const sendVerificationEmail = async (email, verificationUrl) => {
     const mailOptions = {
         from: process.env.FROM_EMAIL, // Sender's email (from .env file)
         to: email,                    // Recipient's email
-        subject: 'Email Verification', // Subject of the email
-        text: `Please verify your email by clicking the following link: ${verificationUrl}`, // Plain text content
+        subject: 'Your OTP Code',      // Subject of the email
+        text: `Your One-Time Password (OTP) is: ${otp}. It is valid for 10 minutes.`, // Plain text content
         html: `
             <div style="font-family: Arial, sans-serif; text-align: center; background-color: #f4f4f4; padding: 20px;">
                 <div style="background-color: #ffffff; padding: 20px; max-width: 600px; margin: 0 auto; border-radius: 8px;">
-                    <h1 style="color: #4CAF50;">Verify Your Email</h1>
-                    <p>Thank you for registering! To complete your registration, please verify your email by clicking the button below:</p>
-                    <a href="${verificationUrl}" style="padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">Verify Email</a>
-                    <p>If the button doesn't work, please copy and paste the following link into your browser:</p>
-                    <p>${verificationUrl}</p>
+                    <h1 style="color: #4CAF50;">Your OTP Code</h1>
+                    <p>Thank you for registering! Your One-Time Password (OTP) is:</p>
+                    <h2 style="color: #4CAF50;">${otp}</h2>
+                    <p>This code is valid for 10 minutes. Please use it to verify your email address.</p>
                     <p>If you did not request this, please disregard this email.</p>
                 </div>
                 <footer style="font-size: 12px; color: #777; margin-top: 20px;">&copy; 2024 Your Company. All rights reserved.</footer>
@@ -58,13 +66,13 @@ const sendVerificationEmail = async (email, verificationUrl) => {
     try {
         // Attempt to send the email
         const info = await transporter.sendMail(mailOptions);
-        console.log(`Verification email sent to ${email}: ${info.messageId}`);
+        console.log(`OTP email sent to ${email}: ${info.messageId}`);
         return info; // Return info object if email was successfully sent
     } catch (error) {
         // Log and throw error if email could not be sent
-        console.error(`Error sending verification email to ${email}:`, error.message);
+        console.error(`Error sending OTP email to ${email}:`, error.message);
         throw new Error('Email could not be sent');
     }
 };
 
-module.exports = { sendVerificationEmail };
+module.exports = { sendVerificationOtp, generateOtp };

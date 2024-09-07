@@ -2,9 +2,9 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const { sendVerificationEmail } = require('../services/emailService');
+const { sendVerificationOtp, generateOtp } = require('../services/emailService');
 const blacklist = require('../utils/blacklist');
-const { cloudinary } = require('../utils/cloudinary'); // Add cloudinary for image uploads
+const { cloudinary } = require('../utils/cloudinary');
 
 // Helper function to generate JWT token
 const generateToken = (user) => {
@@ -19,77 +19,78 @@ const generateToken = (user) => {
     );
 };
 
-// Register User (Email/Password + Image Upload)
+// Register User (Email/Password + Image Upload + OTP)
 exports.register = async (req, res) => {
     const { name, email, password, phone } = req.body;
 
     try {
-        // Check for existing user
+        // Check if user already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ success: false, error: 'Email already exists' });
         }
 
-        // Handle image upload if present
-        let imageUrl = 'no-photo.jpg'; // Default image
+        // Handle image upload
+        let imageUrl = 'default-image-url'; // Fallback image URL if no image is uploaded
         if (req.file) {
             const result = await cloudinary.uploader.upload(req.file.path, {
                 folder: 'user_images',
                 use_filename: true,
                 unique_filename: false,
-                overwrite: true,
+                overwrite: true
             });
-            imageUrl = result.secure_url; // Get the uploaded image URL from Cloudinary
+            imageUrl = result.secure_url;
         }
 
-        // Create a new user
+        // Create the user
         const user = await User.create({
             name,
             email,
             password,
             phone,
-            image: imageUrl, // Store the image URL or default
-            isVerified: false, // Field to track email verification
+            image: imageUrl,
+            isVerified: false, 
         });
 
-        // Generate a verification token
-        const verificationToken = crypto.randomBytes(32).toString('hex');
+        // Generate OTP
+        const otp = generateOtp();
 
-        // Save the token in the user document
-        user.verificationToken = verificationToken;
-        user.verificationExpires = Date.now() + 24 * 60 * 60 * 1000; // Token expires in 24 hours
+        // Save OTP and its expiration in the user document
+        user.verificationOtp = otp;
+        user.verificationExpires = Date.now() + 10 * 60 * 1000; // OTP expires in 10 minutes
         await user.save();
 
-        // Send verification email
-        const verificationUrl = `${req.protocol}://${req.get('host')}/api/auth/verify-email/${verificationToken}`;
-        await sendVerificationEmail(user.email, verificationUrl);
+        // Send OTP via email
+        await sendVerificationOtp(user.email, otp);
 
         res.status(200).json({
             success: true,
-            message: 'Registration successful. Please check your email to verify your account.',
+            message: 'Registration successful. Please check your email for the OTP to verify your account.',
         });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
     }
 };
 
-// Verify Email
-exports.verifyEmail = async (req, res) => {
-    const { token } = req.params;
+// Verify OTP
+exports.verifyOtp = async (req, res) => {
+    const { email, otp } = req.body;
 
     try {
+        // Find user by email and check if OTP matches and is not expired
         const user = await User.findOne({
-            verificationToken: token,
-            verificationExpires: { $gt: Date.now() }, // Check that the token is still valid
+            email,
+            verificationOtp: otp,
+            verificationExpires: { $gt: Date.now() }, // Check OTP expiration
         });
 
         if (!user) {
-            return res.status(400).json({ success: false, error: 'Invalid or expired verification token' });
+            return res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
         }
 
         user.isVerified = true;
-        user.verificationToken = undefined;
-        user.verificationExpires = undefined;
+        user.verificationOtp = undefined; // Clear OTP
+        user.verificationExpires = undefined; // Clear OTP expiration
         await user.save();
 
         // Send back a token including the role

@@ -2,7 +2,7 @@ const express = require('express');
 const passport = require('passport');
 const { 
     register, 
-    verifyEmail, 
+    verifyOtp,
     login, 
     googleAuthCallback, 
     logout 
@@ -13,8 +13,8 @@ const router = express.Router();
 // Route to register a new user with image upload
 router.post('/register', upload.single('image'), register);
 
-// Route to verify email (using the verification token)
-router.get('/verify-email/:token', verifyEmail);
+// Route to verify OTP
+router.post('/verify-otp', verifyOtp);  // Change from verify-email to verify OTP
 
 // Route to login the user
 router.post('/login', login);
@@ -29,7 +29,7 @@ router.get('/google',
 
 router.get('/google/callback', 
     passport.authenticate('google', { session: false }), 
-    googleAuthCallback // Pass the callback directly without extra function
+    googleAuthCallback // Pass the callback directly
 );
 
 // Route to get Google OAuth Client ID
