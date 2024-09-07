@@ -1,8 +1,8 @@
 const nodemailer = require('nodemailer');
-const crypto = require('crypto');
+const speakeasy = require('speakeasy');
 
 // Ensure required environment variables are defined
-const requiredEnvVars = ['SMTP_HOST', 'SMTP_PORT', 'EMAIL_USER', 'EMAIL_PASS', 'FROM_EMAIL'];
+const requiredEnvVars = ['SMTP_HOST', 'SMTP_PORT', 'EMAIL_USER', 'EMAIL_PASS', 'FROM_EMAIL', 'OTP_SECRET'];
 requiredEnvVars.forEach((envVar) => {
     if (!process.env[envVar]) {
         console.error(`Missing required environment variable: ${envVar}`);
@@ -22,18 +22,37 @@ const transporter = nodemailer.createTransport({
 });
 
 /**
- * Generates a 6-digit OTP code
+ * Generates a time-based OTP using Speakeasy
  * @returns {string} - The generated OTP code.
  */
 const generateOtp = () => {
-    return crypto.randomInt(100000, 999999).toString();  // Generate a 6-digit random OTP
+    return speakeasy.totp({
+        secret: process.env.OTP_SECRET,
+        encoding: 'base32',
+        step: 600, // 10-minute validity (step in seconds)
+    });
+};
+
+/**
+ * Verifies the OTP using Speakeasy
+ * @param {string} otp - The OTP code to verify.
+ * @returns {boolean} - Returns true if the OTP is valid, otherwise false.
+ */
+const verifyOtp = (otp) => {
+    return speakeasy.totp.verify({
+        secret: process.env.OTP_SECRET,
+        encoding: 'base32',
+        token: otp,
+        step: 600, // 10-minute validity (step in seconds)
+        window: 1, // Allows one step backward for slight time mismatch
+    });
 };
 
 /**
  * Sends an OTP email to the provided email address.
  * @param {string} email - The recipient's email address.
  * @param {string} otp - The OTP code to be sent for verification.
- * @returns {Promise} - Resolves if email is successfully sent, otherwise throws an error.
+ * @returns {Promise} - Resolves if the email is successfully sent, otherwise throws an error.
  */
 const sendVerificationOtp = async (email, otp) => {
     // Validate the required parameters
@@ -75,4 +94,4 @@ const sendVerificationOtp = async (email, otp) => {
     }
 };
 
-module.exports = { sendVerificationOtp, generateOtp };
+module.exports = { sendVerificationOtp, generateOtp, verifyOtp };

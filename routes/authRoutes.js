@@ -2,17 +2,29 @@ const express = require('express');
 const passport = require('passport');
 const { 
     register, 
-    verifyOtp,  // Changed to OTP verification
+    verifyOtp, 
     login, 
     googleAuthCallback, 
     logout 
 } = require('../controllers/authController');
-const upload = require('../utils/multer'); // Import Multer for handling file uploads or base64
+const upload = require('../utils/multer'); // Multer middleware for file uploads
 
 const router = express.Router();
 
-// Route to register a new user with optional image upload (file or base64)
-router.post('/register', upload.single('image'), register);
+// Route to register a new user with optional image upload (file or Base64)
+router.post('/register', (req, res, next) => {
+    // Handle optional file upload with Multer
+    upload.single('image')(req, res, (err) => {
+        if (err) {
+            // Handle Multer upload errors
+            return res.status(400).json({
+                success: false,
+                error: 'Error uploading image. Please try again.'
+            });
+        }
+        next(); // Continue to the controller if upload succeeds or no file is provided
+    });
+}, register);
 
 // Route to verify OTP for email verification
 router.post('/verify-otp', verifyOtp);  // Changed from verify-email to verify OTP

@@ -1,8 +1,7 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
-const { sendVerificationOtp, generateOtp } = require('../services/emailService');
+const { sendVerificationOtp, generateOtp, verifyOtp } = require('../services/emailService');
 const blacklist = require('../utils/blacklist');
-const fs = require('fs');
 
 // Helper function to generate JWT token
 const generateToken = (user) => {
@@ -17,56 +16,33 @@ const generateToken = (user) => {
     );
 };
 
-// Helper function to convert image to Base64
-const convertImageToBase64 = (imagePath) => {
-    try {
-        const image = fs.readFileSync(imagePath); // Read image from file system
-        return `data:image/jpeg;base64,${image.toString('base64')}`; // Convert to Base64
-    } catch (err) {
-        throw new Error('Failed to convert image to Base64');
-    }
-};
-
-// Register User (Email/Password + Base64 Image + OTP)
+// Register User (Email/Password + OTP)
 exports.register = async (req, res) => {
     const { name, email, password, phone } = req.body;
 
     try {
-        // Check if user already exists
+        // Check if the user already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ success: false, error: 'Email already exists' });
         }
 
-        // Handle image upload and convert it to Base64
-        let imageUrl = 'default-image-url'; // Default image (Base64 string or URL)
-        if (req.file) {
-            imageUrl = convertImageToBase64(req.file.path); // Convert image to Base64
-        } else if (req.body.imageBase64) {
-            // If Base64 image is provided directly from the frontend
-            imageUrl = req.body.imageBase64;
-        }
+        // Generate OTP
+        const otp = generateOtp();
 
-        // Create the user
+        // Create the user but mark as unverified
         const user = await User.create({
             name,
             email,
             password,
             phone,
-            image: imageUrl,
             isVerified: false,
+            verificationOtp: otp,
+            verificationExpires: Date.now() + 10 * 60 * 1000 // OTP expires in 10 minutes
         });
 
-        // Generate OTP
-        const otp = generateOtp();
-
-        // Save OTP and its expiration in the user document
-        user.verificationOtp = otp;
-        user.verificationExpires = Date.now() + 10 * 60 * 1000; // OTP expires in 10 minutes
-        await user.save();
-
         // Send OTP via email
-        await sendVerificationOtp(user.email, otp);
+        await sendVerificationOtp(email, otp);
 
         res.status(200).json({
             success: true,
@@ -82,29 +58,28 @@ exports.verifyOtp = async (req, res) => {
     const { email, otp } = req.body;
 
     try {
-        // Find user by email and check if OTP matches and is not expired
-        const user = await User.findOne({
-            email,
-            verificationOtp: otp,
-            verificationExpires: { $gt: Date.now() }, // Check OTP expiration
-        });
+        // Find the user by email
+        const user = await User.findOne({ email });
 
-        if (!user) {
+        // Check if OTP is valid and not expired
+        const isValidOtp = verifyOtp(otp, user.verificationOtp); // Ensure you pass the correct arguments to verifyOtp
+        if (!isValidOtp || Date.now() > user.verificationExpires) {
             return res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
         }
 
+        // Mark the user as verified
         user.isVerified = true;
         user.verificationOtp = undefined; // Clear OTP
         user.verificationExpires = undefined; // Clear OTP expiration
         await user.save();
 
-        // Send back a token including the role
-        const authToken = generateToken(user);
+        // Generate token and send it in the response
+        const token = generateToken(user);
 
         res.status(200).json({
             success: true,
             message: 'Email successfully verified. You are now logged in.',
-            token: authToken,
+            token: token
         });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
@@ -126,7 +101,7 @@ exports.login = async (req, res) => {
             return res.status(401).json({ success: false, error: 'Email not verified. Please verify your email.' });
         }
 
-        // Generate token including the role
+        // Generate token
         const token = generateToken(user);
 
         res.status(200).json({
