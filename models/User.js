@@ -16,7 +16,7 @@ const UserSchema = new mongoose.Schema({
     password: { 
         type: String, 
         minlength: 6,
-        select: false  // Don't return the password by default in queries
+        select: false  // Exclude password from query results by default
     },
     googleId: { 
         type: String, 
@@ -29,29 +29,29 @@ const UserSchema = new mongoose.Schema({
         default: 'user' 
     },
     image: { 
-        type: String, 
-        default: 'no-photo.jpg'  // Default to no-photo if none is provided
+        type: String,  // Storing the image as a Base64-encoded string
+        default: 'data:image/jpeg;base64,<default_base64_image>'  // Replace with actual base64 default image string
     },
     phone: {
         type: String, 
-        required: true,  // Make phone required for all users
+        required: true,  // Phone number required
         match: [/^\+?[1-9]\d{1,14}$/, 'Please provide a valid phone number']
     },
     isVerified: { 
         type: Boolean, 
-        default: false  // Defaults to false, updated upon OTP or email verification
+        default: false  // Defaults to false until verification
     },
     verificationToken: { 
-        type: String  // For token-based verification (if used)
+        type: String  // Used for token-based email verification (if needed)
     },
     verificationExpires: { 
         type: Date  // Expiry time for verification token
     },
     otp: {
-        type: String  // OTP for email or phone verification
+        type: String  // Stores OTP for email/phone verification
     },
     otpExpires: {
-        type: Date  // Expiry time for the OTP
+        type: Date  // Expiry time for OTP
     },
     createdAt: { 
         type: Date, 
@@ -59,21 +59,34 @@ const UserSchema = new mongoose.Schema({
     },
 });
 
-// Hash the password before saving (if it's modified or created)
+// Pre-save middleware to hash the password before saving or updating
 UserSchema.pre('save', async function(next) {
     if (!this.isModified('password')) {
         return next();
     }
 
-    // Hash password before saving
+    // Hash the password with bcrypt
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
     next();
 });
 
-// Match the entered password with the hashed password in the database
+// Method to compare the entered password with the hashed password in the database
 UserSchema.methods.matchPassword = async function(enteredPassword) {
     return await bcrypt.compare(enteredPassword, this.password);
+};
+
+// Method to generate OTP (for phone/email verification)
+UserSchema.methods.generateOTP = function() {
+    const otp = Math.floor(100000 + Math.random() * 900000).toString(); // Generates a 6-digit OTP
+    this.otp = otp;
+    this.otpExpires = Date.now() + 10 * 60 * 1000; // OTP valid for 10 minutes
+    return otp;
+};
+
+// Method to verify OTP
+UserSchema.methods.verifyOTP = function(enteredOtp) {
+    return this.otp === enteredOtp && Date.now() < this.otpExpires;
 };
 
 module.exports = mongoose.model('User', UserSchema);

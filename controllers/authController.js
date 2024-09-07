@@ -1,10 +1,8 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const crypto = require('crypto');
 const { sendVerificationOtp, generateOtp } = require('../services/emailService');
 const blacklist = require('../utils/blacklist');
-const { cloudinary } = require('../utils/cloudinary');
+const fs = require('fs');
 
 // Helper function to generate JWT token
 const generateToken = (user) => {
@@ -19,7 +17,17 @@ const generateToken = (user) => {
     );
 };
 
-// Register User (Email/Password + Image Upload + OTP)
+// Helper function to convert image to Base64
+const convertImageToBase64 = (imagePath) => {
+    try {
+        const image = fs.readFileSync(imagePath); // Read image from file system
+        return `data:image/jpeg;base64,${image.toString('base64')}`; // Convert to Base64
+    } catch (err) {
+        throw new Error('Failed to convert image to Base64');
+    }
+};
+
+// Register User (Email/Password + Base64 Image + OTP)
 exports.register = async (req, res) => {
     const { name, email, password, phone } = req.body;
 
@@ -30,16 +38,13 @@ exports.register = async (req, res) => {
             return res.status(400).json({ success: false, error: 'Email already exists' });
         }
 
-        // Handle image upload
-        let imageUrl = 'default-image-url'; // Fallback image URL if no image is uploaded
+        // Handle image upload and convert it to Base64
+        let imageUrl = 'default-image-url'; // Default image (Base64 string or URL)
         if (req.file) {
-            const result = await cloudinary.uploader.upload(req.file.path, {
-                folder: 'user_images',
-                use_filename: true,
-                unique_filename: false,
-                overwrite: true
-            });
-            imageUrl = result.secure_url;
+            imageUrl = convertImageToBase64(req.file.path); // Convert image to Base64
+        } else if (req.body.imageBase64) {
+            // If Base64 image is provided directly from the frontend
+            imageUrl = req.body.imageBase64;
         }
 
         // Create the user
@@ -49,7 +54,7 @@ exports.register = async (req, res) => {
             password,
             phone,
             image: imageUrl,
-            isVerified: false, 
+            isVerified: false,
         });
 
         // Generate OTP
