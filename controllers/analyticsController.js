@@ -1,10 +1,7 @@
-// controllers/analyticsController.js
-
 const User = require('../models/User');
 const Payment = require('../models/Payment');
 const Package = require('../models/Package');
 const Booking = require('../models/Booking');
-const mongoose = require('mongoose');
 
 // Get analytics data
 exports.getAnalytics = async (req, res) => {
@@ -21,7 +18,8 @@ exports.getAnalytics = async (req, res) => {
                         year: { $year: '$createdAt' },
                         month: { $month: '$createdAt' }
                     },
-                    totalRevenue: { $sum: '$amount' }
+                    totalRevenue: { $sum: '$amount' },
+                    totalBookings: { $sum: 1 }, // For calculating average revenue per booking
                 }
             },
             { $sort: { '_id.year': 1, '_id.month': 1 } }
@@ -77,6 +75,35 @@ exports.getAnalytics = async (req, res) => {
             }
         ]);
 
+        // 7. Calculate Average Revenue Per Booking
+        const averageRevenuePerBooking = totalRevenue.map(rev => ({
+            year: rev._id.year,
+            month: rev._id.month,
+            averageRevenue: rev.totalRevenue / rev.totalBookings || 0
+        }));
+
+        // 8. Calculate Bookings and Revenue Growth Rate (Month-over-Month percentage change)
+        const calculateGrowthRate = (data, key) => {
+            const growth = [];
+            for (let i = 1; i < data.length; i++) {
+                const previous = data[i - 1][key];
+                const current = data[i][key];
+                const growthRate = previous > 0 ? ((current - previous) / previous) * 100 : 0;
+                growth.push({
+                    year: data[i]._id.year,
+                    month: data[i]._id.month,
+                    growthRate: growthRate.toFixed(2)
+                });
+            }
+            return growth;
+        };
+
+        // Bookings Growth Rate
+        const bookingsGrowthRate = calculateGrowthRate(totalBookings, 'totalBookings');
+
+        // Revenue Growth Rate
+        const revenueGrowthRate = calculateGrowthRate(totalRevenue, 'totalRevenue');
+
         // Sending the response with analytics data
         res.status(200).json({
             success: true,
@@ -86,7 +113,10 @@ exports.getAnalytics = async (req, res) => {
                 totalPackages,
                 totalBookings,
                 userGrowth,
-                packageDistribution
+                packageDistribution,
+                averageRevenuePerBooking,
+                bookingsGrowthRate,
+                revenueGrowthRate
             }
         });
 
