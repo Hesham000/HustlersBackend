@@ -19,7 +19,8 @@ exports.getAnalytics = async (req, res) => {
                         month: { $month: '$createdAt' }
                     },
                     totalRevenue: { $sum: '$amount' },
-                    totalBookings: { $sum: 1 }, // For calculating average revenue per booking
+                    totalPayments: { $sum: 1 },  // Track total payments for growth rate calculation
+                    totalBookings: { $sum: 1 },  // For calculating average revenue per booking
                 }
             },
             { $sort: { '_id.year': 1, '_id.month': 1 } }
@@ -82,7 +83,7 @@ exports.getAnalytics = async (req, res) => {
             averageRevenue: rev.totalRevenue / rev.totalBookings || 0
         }));
 
-        // 8. Calculate Bookings and Revenue Growth Rate (Month-over-Month percentage change)
+        // 8. Calculate Bookings, Revenue, and Payment Growth Rate (Month-over-Month percentage change)
         const calculateGrowthRate = (data, key) => {
             const growth = [];
             for (let i = 1; i < data.length; i++) {
@@ -104,6 +105,9 @@ exports.getAnalytics = async (req, res) => {
         // Revenue Growth Rate
         const revenueGrowthRate = calculateGrowthRate(totalRevenue, 'totalRevenue');
 
+        // Payment Growth Rate
+        const paymentGrowthRate = calculateGrowthRate(totalRevenue, 'totalPayments');  // Use totalPayments for payment growth
+
         // Sending the response with analytics data
         res.status(200).json({
             success: true,
@@ -116,7 +120,8 @@ exports.getAnalytics = async (req, res) => {
                 packageDistribution,
                 averageRevenuePerBooking,
                 bookingsGrowthRate,
-                revenueGrowthRate
+                revenueGrowthRate,
+                paymentGrowthRate  // Include payment growth rate
             }
         });
 
