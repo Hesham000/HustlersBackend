@@ -64,7 +64,7 @@ const sendVerificationOtp = async (email, otp) => {
 
     // Define the email content and format
     const mailOptions = {
-        from: `"No Reply" <${process.env.FROM_EMAIL}>`, // Display name and sender's email (from .env file)
+        from: `"Hustlers" <${process.env.FROM_EMAIL}>`, // Display name and sender's email (from .env file)
         to: email,                    // Recipient's email
         subject: 'Your OTP Code',      // Subject of the email
         text: `Your One-Time Password (OTP) is: ${otp}. It is valid for 10 minutes.`, // Plain text content
