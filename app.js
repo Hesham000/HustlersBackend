@@ -49,6 +49,8 @@ const userRoutes = require('./routes/userRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const contactRoutes = require('./routes/contactRoutes');
+
 
 // Mount routers to handle specific routes
 app.use('/api/auth', authRoutes);
@@ -57,6 +59,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/contact', contactRoutes);
 
 // Custom error handling middleware (must be last)
 app.use(errorHandler);

@@ -7,7 +7,7 @@ const {
     googleAuthCallback, 
     logout 
 } = require('../controllers/authController');
-const upload = require('../utils/multer'); // Multer middleware for file uploads
+const upload = require('../utils/multer'); // Import Multer for handling file uploads
 
 const router = express.Router();
 

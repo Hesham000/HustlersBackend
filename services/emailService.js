@@ -16,8 +16,8 @@ const transporter = nodemailer.createTransport({
     port: Number(process.env.SMTP_PORT), // Convert port to number
     secure: process.env.SMTP_PORT === '465', // Enable secure connection if port 465 is used
     auth: {
-        user: process.env.EMAIL_USER, // SMTP user
-        pass: process.env.EMAIL_PASS, // SMTP password
+        user: process.env.EMAIL_USER, // SMTP user (Gmail account email)
+        pass: process.env.EMAIL_PASS, // SMTP password (Gmail app password)
     },
 });
 
@@ -64,22 +64,22 @@ const sendVerificationOtp = async (email, otp) => {
 
     // Define the email content and format
     const mailOptions = {
-        from: process.env.FROM_EMAIL, // Sender's email (from .env file)
+        from: `"No Reply" <${process.env.FROM_EMAIL}>`, // Display name and sender's email (from .env file)
         to: email,                    // Recipient's email
         subject: 'Your OTP Code',      // Subject of the email
         text: `Your One-Time Password (OTP) is: ${otp}. It is valid for 10 minutes.`, // Plain text content
         html: `
-            <div style="font-family: Arial, sans-serif; text-align: center; background-color: #f4f4f4; padding: 20px;">
-                <div style="background-color: #ffffff; padding: 20px; max-width: 600px; margin: 0 auto; border-radius: 8px;">
-                    <h1 style="color: #4CAF50;">Your OTP Code</h1>
-                    <p>Thank you for registering! Your One-Time Password (OTP) is:</p>
-                    <h2 style="color: #4CAF50;">${otp}</h2>
-                    <p>This code is valid for 10 minutes. Please use it to verify your email address.</p>
-                    <p>If you did not request this, please disregard this email.</p>
+            <div style="font-family: Arial, sans-serif; text-align: center; background-color: #241933; padding: 20px; color: white;">
+                <div style="background-color: #4c356B; padding: 20px; max-width: 600px; margin: 0 auto; border-radius: 12px;">
+                    <h1 style="color: #9881fd;">Your OTP Code</h1>
+                    <p style="color: #ddd;">Thank you for registering! Your One-Time Password (OTP) is:</p>
+                    <h2 style="color: #fff; background-color: #9881fd; padding: 10px 20px; border-radius: 8px;">${otp}</h2>
+                    <p style="color: #ddd;">This code is valid for <strong>10 minutes</strong>. Please use it to verify your email address.</p>
+                    <p style="color: #ddd;">If you did not request this, please disregard this email.</p>
                 </div>
-                <footer style="font-size: 12px; color: #777; margin-top: 20px;">&copy; 2024 Your Company. All rights reserved.</footer>
+                <footer style="font-size: 12px; color: #777; margin-top: 20px;">&copy; 2024 Hustlersecom. All rights reserved.</footer>
             </div>
-        `, // HTML content with styling
+        `, // HTML content with the specified colors
     };
 
     try {
@@ -93,5 +93,7 @@ const sendVerificationOtp = async (email, otp) => {
         throw new Error('Email could not be sent');
     }
 };
+
+
 
 module.exports = { sendVerificationOtp, generateOtp, verifyOtp };

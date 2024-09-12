@@ -16,55 +16,45 @@ const generateToken = (user) => {
     );
 };
 
-// Register User (Email/Password + OTP)
+// Helper function to convert image buffer to Base64
+const convertImageToBase64 = (buffer) => {
+    return buffer.toString('base64');
+};
+
+// Register User (with optional image upload)
 exports.register = async (req, res) => {
     const { name, email, password, phone } = req.body;
 
     try {
-        // Check if the user already exists
+        // Check if user already exists
         const existingUser = await User.findOne({ email });
-
         if (existingUser) {
-            // If the user is already verified, return a message
-            if (existingUser.isVerified) {
-                return res.status(400).json({ 
-                    success: false, 
-                    error: 'This email is already in use and verified. Please log in.' 
-                });
-            } else {
-                // If the user is not verified, regenerate and resend OTP
-                const newOtp = generateOtp();
-
-                // Update the user's OTP and expiration
-                existingUser.verificationOtp = newOtp;
-                existingUser.verificationExpires = Date.now() + 10 * 60 * 1000; // OTP expires in 10 minutes
-                await existingUser.save();
-
-                // Resend the OTP via email
-                await sendVerificationOtp(email, newOtp);
-
-                return res.status(200).json({
-                    success: true,
-                    message: 'This email is already registered but not verified. A new OTP has been sent to verify your account.'
-                });
-            }
+            return res.status(400).json({ success: false, error: 'Email already exists' });
         }
 
-        // If the user does not exist, create a new user and generate OTP
-        const otp = generateOtp();
+        let imageUrl = 'default-image-url'; // Default image URL if no image is uploaded
+        if (req.file) {
+            // Convert uploaded image to Base64 or store it in your cloud service
+            imageUrl = `data:image/jpeg;base64,${convertImageToBase64(req.file.buffer)}`;
+        }
 
-        const newUser = await User.create({
+        // Create the user
+        const user = await User.create({
             name,
             email,
             password,
             phone,
+            image: imageUrl, // Save the image URL or Base64 string
             isVerified: false,
-            verificationOtp: otp,
-            verificationExpires: Date.now() + 10 * 60 * 1000 // OTP expires in 10 minutes
         });
 
-        // Send OTP via email
-        await sendVerificationOtp(email, otp);
+        // Generate OTP and send it via email
+        const otp = generateOtp();
+        user.verificationOtp = otp;
+        user.verificationExpires = Date.now() + 10 * 60 * 1000; // OTP expires in 10 minutes
+        await user.save();
+        
+        await sendVerificationOtp(user.email, otp);
 
         res.status(200).json({
             success: true,
@@ -74,6 +64,7 @@ exports.register = async (req, res) => {
         res.status(400).json({ success: false, error: err.message });
     }
 };
+
 
 // Verify OTP
 exports.verifyOtp = async (req, res) => {
