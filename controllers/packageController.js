@@ -1,19 +1,41 @@
 
 const Package = require('../models/Package');
-const fs = require('fs');
+const cloudinary = require('../utils/cloudinaryConfig');
 
 // Add a new package
 exports.addPackage = async (req, res) => {
     const { title, description, price } = req.body;
 
     try {
-        const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+        let imageUrl = null; // Initialize imageUrl as null
 
+        // If the request includes an image file, upload it to Cloudinary
+        if (req.file) {
+            // Upload file buffer to Cloudinary using a promise
+            const result = await new Promise((resolve, reject) => {
+                const uploadStream = cloudinary.uploader.upload_stream(
+                    { folder: 'package_images' },
+                    (error, result) => {
+                        if (error) {
+                            reject(new Error('Failed to upload image to Cloudinary'));
+                        } else {
+                            resolve(result);
+                        }
+                    }
+                );
+                // Pass the file buffer to Cloudinary upload stream
+                uploadStream.end(req.file.buffer);
+            });
+
+            imageUrl = result.secure_url; // Assign Cloudinary URL after upload
+        }
+
+        // Create the new package
         const newPackage = await Package.create({
             title,
             description,
             price,
-            imageUrl,
+            imageUrl, // Store the Cloudinary URL
         });
 
         res.status(201).json({ success: true, data: newPackage });

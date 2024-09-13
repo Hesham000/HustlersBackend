@@ -2,6 +2,7 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const { sendVerificationOtp, generateOtp, verifyOtp } = require('../services/emailService');
 const blacklist = require('../utils/blacklist');
+const cloudinary = require('../utils/cloudinaryConfig');
 
 // Helper function to generate JWT token
 const generateToken = (user) => {
@@ -17,44 +18,69 @@ const generateToken = (user) => {
 };
 
 // Helper function to convert image buffer to Base64
-const convertImageToBase64 = (buffer) => {
-    return buffer.toString('base64');
-};
-
-// Register User (with optional image upload)
 exports.register = async (req, res) => {
     const { name, email, password, phone } = req.body;
 
     try {
-        // Check if user already exists
+        // Check if the user already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
-            return res.status(400).json({ success: false, error: 'Email already exists' });
+            if (existingUser.isVerified) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'This email is already in use and verified. Please log in.',
+                });
+            } else {
+                const newOtp = generateOtp();
+                existingUser.verificationOtp = newOtp;
+                existingUser.verificationExpires = Date.now() + 10 * 60 * 1000;
+                await existingUser.save();
+
+                await sendVerificationOtp(email, newOtp);
+                return res.status(200).json({
+                    success: true,
+                    message: 'This email is already registered but not verified. A new OTP has been sent to verify your account.',
+                });
+            }
         }
 
-        let imageUrl = 'default-image-url'; // Default image URL if no image is uploaded
+        // Image upload to Cloudinary (if file is provided)
+        let imageUrl = 'default-image-url'; // Default image URL
         if (req.file) {
-            // Convert uploaded image to Base64 or store it in your cloud service
-            imageUrl = `data:image/jpeg;base64,${convertImageToBase64(req.file.buffer)}`;
+            // Upload file buffer to Cloudinary using a promise
+            const result = await new Promise((resolve, reject) => {
+                const uploadStream = cloudinary.uploader.upload_stream(
+                    { folder: 'user_images' },
+                    (error, result) => {
+                        if (error) {
+                            reject(new Error('Failed to upload image to Cloudinary'));
+                        } else {
+                            resolve(result);
+                        }
+                    }
+                );
+                // Pass the file buffer to Cloudinary upload stream
+                uploadStream.end(req.file.buffer);
+            });
+
+            imageUrl = result.secure_url; // Assign Cloudinary URL after upload
         }
 
-        // Create the user
-        const user = await User.create({
+        // Create the new user
+        const otp = generateOtp();
+        const newUser = await User.create({
             name,
             email,
             password,
             phone,
-            image: imageUrl, // Save the image URL or Base64 string
+            image: imageUrl, // Store the Cloudinary URL
             isVerified: false,
+            verificationOtp: otp,
+            verificationExpires: Date.now() + 10 * 60 * 1000, // OTP expires in 10 minutes
         });
 
-        // Generate OTP and send it via email
-        const otp = generateOtp();
-        user.verificationOtp = otp;
-        user.verificationExpires = Date.now() + 10 * 60 * 1000; // OTP expires in 10 minutes
-        await user.save();
-        
-        await sendVerificationOtp(user.email, otp);
+        // Send OTP via email
+        await sendVerificationOtp(email, otp);
 
         res.status(200).json({
             success: true,
