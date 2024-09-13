@@ -22,11 +22,14 @@ connectDB();
 const app = express();
 
 // Enable CORS with options to allow requests from the frontend
+// app.use(cors({
+//     origin: process.env.FRONTEND_URL || 'http://localhost:3000', // Use FRONTEND_URL from env or fallback to localhost
+//     credentials: true, // Allow cookies to be sent with requests
+// }));
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000', // Use FRONTEND_URL from env or fallback to localhost
-    credentials: true, // Allow cookies to be sent with requests
+    origin: '*', // Allow requests from any origin
+    credentials: true,
 }));
-
 // Middleware to serve static files from the "uploads" directory
 app.use('/uploads', express.static('uploads'));
 

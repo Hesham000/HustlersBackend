@@ -1,65 +1,71 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const Package = require('../models/Package');
+const createCheckoutSession = async (req, res) => {
+    const { packageId, currency = 'aed' } = req.body;
+    const userId = req.user?.id; // Ensure you have the userId from authentication middleware
 
-// Create a payment intent with packageId in the metadata
-const createPaymentIntent = async (req, res) => {
-    const { amount, currency = 'aed', packageId } = req.body;
-
-    // Ensure userId comes from req.user if using authentication middleware
-    const userId = req.user?.id;
-
-    // Check if required fields are provided
-    if (!amount || !packageId) {
+    // Validate inputs
+    if (!packageId) {
         return res.status(400).json({
             success: false,
-            error: 'Amount and packageId are required.',
-        });
-    }
-
-    // Ensure amount is a positive integer (smallest unit like cents for USD)
-    if (!Number.isInteger(amount) || amount <= 0) {
-        return res.status(400).json({
-            success: false,
-            error: 'Amount must be a positive integer in the smallest currency unit (e.g., cents for USD).',
+            error: 'PackageId is required.',
         });
     }
 
     try {
-        // Create a payment intent with Stripe
-        const paymentIntent = await stripe.paymentIntents.create({
-            amount,  // Amount in smallest currency unit (e.g., cents for USD)
-            currency,
-            metadata: {
-                packageId,  // Package ID for metadata
-                userId      // User ID for metadata (from req.user)
-            },
-            automatic_payment_methods: {
-                enabled: true,  // Enable automatic payment methods
-            },
-            payment_method_options: {
-                card: {
-                    request_three_d_secure: 'automatic',  // Enable 3D Secure when required
+        // Fetch the package from the database
+        const packageData = await Package.findById(packageId);
+
+        if (!packageData) {
+            return res.status(404).json({
+                success: false,
+                error: 'Package not found.',
+            });
+        }
+
+        // Use priceAfterDiscount or price for the amount
+        const amount = packageData.priceAfterDiscount * 100; // Convert to smallest currency unit (e.g., cents)
+
+        // Create a Checkout Session using Stripe
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'], // Specify allowed payment methods
+            line_items: [
+                {
+                    price_data: {
+                        currency,
+                        product_data: {
+                            name: packageData.title, // Use the package title
+                        },
+                        unit_amount: amount, // Amount in smallest currency unit (e.g., cents)
+                    },
+                    quantity: 1,
                 },
+            ],
+            mode: 'payment', // One-time payment mode
+            success_url: `${process.env.FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`, // Redirect here on success
+            cancel_url: `${process.env.FRONTEND_URL}/cancel`, // Redirect here if the user cancels
+            metadata: {
+                packageId, // Include packageId in metadata
+                userId,    // Include userId in metadata
             },
         });
 
-        // Respond with the payment intent's client_secret and other data
-        res.status(201).json({
+        // Respond with the URL of the Checkout Session
+        res.status(200).json({
             success: true,
-            clientSecret: paymentIntent.client_secret,  // Client secret for the frontend to confirm payment
-            paymentIntent,  // Optionally return the entire payment intent object
-            next_action: paymentIntent.next_action || null,  // Handle any additional actions like 3D Secure
+            sessionId: session.id, // Return session ID for the frontend
+            url: session.url,      // Stripe Checkout page URL to redirect the user
         });
     } catch (error) {
-        // Handle Stripe errors and log detailed messages
-        console.error('Error creating payment intent:', error.message);
+        console.error('Error creating checkout session:', error.message);
         res.status(500).json({
             success: false,
-            error: 'Failed to create payment intent',
+            error: 'Failed to create checkout session',
             details: error.message,
         });
     }
 };
 
 module.exports = {
-    createPaymentIntent,
+    createCheckoutSession,
 };

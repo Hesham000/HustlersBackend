@@ -9,7 +9,7 @@ const storage = multer.memoryStorage();
 // Initialize Multer with memory storage and file filter
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB limit for images and videos
+    limits: { fileSize: 100 * 1024 * 1024 }, // 50 MB limit for images and videos
     fileFilter: (req, file, cb) => {
         if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
             cb(null, true);
