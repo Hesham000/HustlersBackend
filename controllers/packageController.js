@@ -3,7 +3,7 @@ const cloudinary = require('../utils/cloudinaryConfig');
 
 // Add a new package
 exports.addPackage = async (req, res) => {
-    const { title, description, price } = req.body;
+    const { title, description, price, packageFeatures } = req.body;
 
     try {
         let imageUrl = null;
@@ -51,7 +51,8 @@ exports.addPackage = async (req, res) => {
             description,
             price,
             imageUrl, // Store the Cloudinary image URL
-            videoUrl  // Store the Cloudinary video URL
+            videoUrl, // Store the Cloudinary video URL
+            packageFeatures: packageFeatures ? packageFeatures.split(',').map(feature => feature.trim()) : [] // Convert string to array if necessary
         });
 
         res.status(201).json({ success: true, data: newPackage });
