@@ -1,21 +1,25 @@
+// routes/paymentRoutes.js
 const express = require('express');
+const { protect, restrictTo } = require('../middleware/authMiddleware');
 const {
     createPaymentIntent,
     createPayment,
     getPayments,
-    getPaymentById,
-    updatePaymentStatus
+    updatePaymentStatus,
 } = require('../controllers/paymentController');
-const { protect, restrictTo } = require('../middleware/authMiddleware');
+
 const router = express.Router();
 
 // Create a Stripe payment intent
-router.post('/create-payment-intent', protect, createPaymentIntent); // Create Stripe payment intent
+router.post('/create-payment-intent', protect, createPaymentIntent);
 
-// Payment CRUD operations
-router.post('/', protect, createPayment); // Store payment in the database
-router.get('/', protect, restrictTo('admin'), getPayments); // Get all payments (admin)
-router.get('/:id', protect, restrictTo('admin', 'user'), getPaymentById); // Get a specific payment by ID
-router.put('/:id', protect, restrictTo('admin'), updatePaymentStatus); // Update payment status (admin)
+// Store payment after confirmation
+router.post('/', protect, createPayment);
+
+// Admin-only route to get all payments
+router.get('/', protect, restrictTo('admin'), getPayments);
+
+// Update payment status (admin)
+router.put('/:id', protect, restrictTo('admin'), updatePaymentStatus);
 
 module.exports = router;

@@ -6,12 +6,12 @@ exports.addPackage = async (req, res) => {
     const { title, description, price } = req.body;
 
     try {
-        let imageUrl = null; // Initialize imageUrl as null
+        let imageUrl = null;
+        let videoUrl = null;
 
         // If the request includes an image file, upload it to Cloudinary
-        if (req.file) {
-            // Upload file buffer to Cloudinary using a promise
-            const result = await new Promise((resolve, reject) => {
+        if (req.files && req.files.image) {
+            const imageResult = await new Promise((resolve, reject) => {
                 const uploadStream = cloudinary.uploader.upload_stream(
                     { folder: 'package_images' },
                     (error, result) => {
@@ -22,11 +22,27 @@ exports.addPackage = async (req, res) => {
                         }
                     }
                 );
-                // Pass the file buffer to Cloudinary upload stream
-                uploadStream.end(req.file.buffer);
+                uploadStream.end(req.files.image[0].buffer);
             });
+            imageUrl = imageResult.secure_url;
+        }
 
-            imageUrl = result.secure_url; // Assign Cloudinary URL after upload
+        // If the request includes a video file, upload it to Cloudinary
+        if (req.files && req.files.video) {
+            const videoResult = await new Promise((resolve, reject) => {
+                const uploadStream = cloudinary.uploader.upload_stream(
+                    { folder: 'package_videos', resource_type: 'video' },
+                    (error, result) => {
+                        if (error) {
+                            reject(new Error('Failed to upload video to Cloudinary'));
+                        } else {
+                            resolve(result);
+                        }
+                    }
+                );
+                uploadStream.end(req.files.video[0].buffer);
+            });
+            videoUrl = videoResult.secure_url;
         }
 
         // Create the new package
@@ -34,7 +50,8 @@ exports.addPackage = async (req, res) => {
             title,
             description,
             price,
-            imageUrl, // Store the Cloudinary URL
+            imageUrl, // Store the Cloudinary image URL
+            videoUrl  // Store the Cloudinary video URL
         });
 
         res.status(201).json({ success: true, data: newPackage });
@@ -53,6 +70,21 @@ exports.getPackages = async (req, res) => {
     }
 };
 
+// Get a single package by ID
+exports.getPackage = async (req, res) => {
+    try {
+        const package = await Package.findById(req.params.id);
+
+        if (!package) {
+            return res.status(404).json({ success: false, error: 'Package not found' });
+        }
+
+        res.status(200).json({ success: true, data: package });
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+};
+
 // Edit an existing package
 exports.editPackage = async (req, res) => {
     const { title, description, price } = req.body;
@@ -65,10 +97,11 @@ exports.editPackage = async (req, res) => {
         }
 
         // Check if a new image file is provided
-        let imageUrl = package.imageUrl; // Use existing image if no new image is uploaded
-        if (req.file) {
-            // Upload new image to Cloudinary
-            const result = await new Promise((resolve, reject) => {
+        let imageUrl = package.imageUrl; 
+        let videoUrl = package.videoUrl; 
+
+        if (req.files && req.files.image) {
+            const imageResult = await new Promise((resolve, reject) => {
                 const uploadStream = cloudinary.uploader.upload_stream(
                     { folder: 'package_images' },
                     (error, result) => {
@@ -79,10 +112,27 @@ exports.editPackage = async (req, res) => {
                         }
                     }
                 );
-                uploadStream.end(req.file.buffer);
+                uploadStream.end(req.files.image[0].buffer);
             });
+            imageUrl = imageResult.secure_url;
+        }
 
-            imageUrl = result.secure_url; // Update image URL if new image is uploaded
+        // Check if a new video file is provided
+        if (req.files && req.files.video) {
+            const videoResult = await new Promise((resolve, reject) => {
+                const uploadStream = cloudinary.uploader.upload_stream(
+                    { folder: 'package_videos', resource_type: 'video' },
+                    (error, result) => {
+                        if (error) {
+                            reject(new Error('Failed to upload video to Cloudinary'));
+                        } else {
+                            resolve(result);
+                        }
+                    }
+                );
+                uploadStream.end(req.files.video[0].buffer);
+            });
+            videoUrl = videoResult.secure_url;
         }
 
         // Update package details
@@ -90,6 +140,7 @@ exports.editPackage = async (req, res) => {
         package.description = description || package.description;
         package.price = price || package.price;
         package.imageUrl = imageUrl;
+        package.videoUrl = videoUrl;
 
         await package.save();
 
@@ -108,7 +159,7 @@ exports.deletePackage = async (req, res) => {
             return res.status(404).json({ success: false, error: 'Package not found' });
         }
 
-        res.status(200).json({ success: true, data: {} });
+        res.status(200).json({ success: true, message: 'Package deleted successfully' });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
     }

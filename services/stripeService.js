@@ -2,41 +2,52 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // Create a payment intent with packageId in the metadata
 const createPaymentIntent = async (req, res) => {
-    const { amount, currency = 'aed', packageId, userId } = req.body;
+    const { amount, currency = 'aed', packageId } = req.body;
 
-    // Check if amount and packageId are provided
+    // Ensure userId comes from req.user if using authentication middleware
+    const userId = req.user?.id;
+
+    // Check if required fields are provided
     if (!amount || !packageId) {
         return res.status(400).json({
             success: false,
-            error: 'Amount and packageId are required',
+            error: 'Amount and packageId are required.',
+        });
+    }
+
+    // Ensure amount is a positive integer (smallest unit like cents for USD)
+    if (!Number.isInteger(amount) || amount <= 0) {
+        return res.status(400).json({
+            success: false,
+            error: 'Amount must be a positive integer in the smallest currency unit (e.g., cents for USD).',
         });
     }
 
     try {
         // Create a payment intent with Stripe
         const paymentIntent = await stripe.paymentIntents.create({
-            amount,  // Amount is in the smallest currency unit (e.g., cents for USD)
+            amount,  // Amount in smallest currency unit (e.g., cents for USD)
             currency,
             metadata: {
-                packageId,  // Add the packageId to the metadata
-                userId      // Add the userId to the metadata (optional)
+                packageId,  // Package ID for metadata
+                userId      // User ID for metadata (from req.user)
             },
             automatic_payment_methods: {
-                enabled: true,  // Allow automatic payment methods
+                enabled: true,  // Enable automatic payment methods
             },
             payment_method_options: {
                 card: {
-                    request_three_d_secure: 'automatic',  // Ensure 3D Secure when required
+                    request_three_d_secure: 'automatic',  // Enable 3D Secure when required
                 },
             },
         });
 
-        // Respond with the payment intent object
+        // Respond with the payment intent's client_secret and other data
         res.status(201).json({
             success: true,
-            clientSecret: paymentIntent.client_secret,  // Return the client_secret for frontend confirmation
-            paymentIntent,  // Optional: Return the entire payment intent object
-            next_action: paymentIntent.next_action || null,  // Handle any additional actions required
+            clientSecret: paymentIntent.client_secret,  // Client secret for the frontend to confirm payment
+            paymentIntent,  // Optionally return the entire payment intent object
+            next_action: paymentIntent.next_action || null,  // Handle any additional actions like 3D Secure
         });
     } catch (error) {
         // Handle Stripe errors and log detailed messages

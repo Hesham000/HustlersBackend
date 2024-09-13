@@ -1,9 +1,13 @@
 const express = require('express');
-const { contactUs } = require('../controllers/contactUsController');
-const { protect } = require('../middleware/authMiddleware');
+const { contactUs, getAllInquiries } = require('../controllers/contactUsController'); 
+const { protect, restrictTo } = require('../middleware/authMiddleware'); // Added 'restrictTo' for role-based access
+
 const router = express.Router();
 
-// Contact Us route
+// POST: Contact Us route (open to all authenticated users)
 router.post('/contact-us', protect, contactUs);
+
+// GET: Get all inquiries (restricted to 'admin' role)
+router.get('/inquiries', protect, restrictTo('admin'), getAllInquiries);
 
 module.exports = router;
