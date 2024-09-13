@@ -3,7 +3,7 @@ const cloudinary = require('../utils/cloudinaryConfig');
 
 // Add a new package
 exports.addPackage = async (req, res) => {
-    const { title, description, price, packageFeatures } = req.body;
+    const { title, description, price, packageFeatures, discountPercent } = req.body;
 
     try {
         let imageUrl = null;
@@ -45,11 +45,19 @@ exports.addPackage = async (req, res) => {
             videoUrl = videoResult.secure_url;
         }
 
+        // Calculate price after discount if discountPercent is provided
+        let priceAfterDiscount = price;
+        if (discountPercent && discountPercent > 0) {
+            priceAfterDiscount = Math.max(price - (price * discountPercent / 100), 0);
+        }
+
         // Create the new package
         const newPackage = await Package.create({
             title,
             description,
             price,
+            discountPercent: discountPercent || 0, // Set default to 0 if not provided
+            priceAfterDiscount, // Calculated price after discount
             imageUrl, // Store the Cloudinary image URL
             videoUrl, // Store the Cloudinary video URL
             packageFeatures: packageFeatures ? packageFeatures.split(',').map(feature => feature.trim()) : [] // Convert string to array if necessary
@@ -60,6 +68,7 @@ exports.addPackage = async (req, res) => {
         res.status(400).json({ success: false, error: err.message });
     }
 };
+
 
 // Get all packages
 exports.getPackages = async (req, res) => {
