@@ -1,4 +1,3 @@
-
 const Package = require('../models/Package');
 const cloudinary = require('../utils/cloudinaryConfig');
 
@@ -43,6 +42,7 @@ exports.addPackage = async (req, res) => {
         res.status(400).json({ success: false, error: err.message });
     }
 };
+
 // Get all packages
 exports.getPackages = async (req, res) => {
     try {
@@ -64,8 +64,28 @@ exports.editPackage = async (req, res) => {
             return res.status(404).json({ success: false, error: 'Package not found' });
         }
 
-        const imageUrl = req.file ? `/uploads/${req.file.filename}` : package.imageUrl;
+        // Check if a new image file is provided
+        let imageUrl = package.imageUrl; // Use existing image if no new image is uploaded
+        if (req.file) {
+            // Upload new image to Cloudinary
+            const result = await new Promise((resolve, reject) => {
+                const uploadStream = cloudinary.uploader.upload_stream(
+                    { folder: 'package_images' },
+                    (error, result) => {
+                        if (error) {
+                            reject(new Error('Failed to upload image to Cloudinary'));
+                        } else {
+                            resolve(result);
+                        }
+                    }
+                );
+                uploadStream.end(req.file.buffer);
+            });
 
+            imageUrl = result.secure_url; // Update image URL if new image is uploaded
+        }
+
+        // Update package details
         package.title = title || package.title;
         package.description = description || package.description;
         package.price = price || package.price;

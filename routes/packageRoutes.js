@@ -1,26 +1,16 @@
 const express = require('express');
 const multer = require('multer');
-const path = require('path');
 const { addPackage, getPackages, editPackage, deletePackage } = require('../controllers/packageController');
 const { protect } = require('../middleware/authMiddleware');
 
-// Configure multer storage
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'uploads/'); // Specify upload directory
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-    }
-});
+// Configure Multer to store uploaded files in memory
+const storage = multer.memoryStorage(); // Temporarily hold files in memory
 
-// Initialize multer with the storage configuration
+// Initialize Multer with the memory storage configuration
 const upload = multer({
-    storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 },
+    storage: storage, // Memory storage
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB file size limit
     fileFilter: (req, file, cb) => {
-        console.log('Field name received:', file.fieldname); // Debugging: log the field name
         if (file.mimetype.startsWith('image/')) {
             cb(null, true);
         } else {
@@ -29,13 +19,11 @@ const upload = multer({
     }
 });
 
-
-
 const router = express.Router();
 
-// Routes using the `upload.single('image')` middleware
+// Routes using the `upload.single('image')` middleware for Cloudinary uploads
 router.route('/')
-    .post(protect, upload.single('image'), addPackage)  // 'image' must match the key name in Postman
+    .post(protect, upload.single('image'), addPackage)  // Handle Cloudinary upload inside the controller
     .get(protect, getPackages);
     
 router.route('/:id')
