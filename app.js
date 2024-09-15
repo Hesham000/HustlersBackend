@@ -68,6 +68,7 @@ const partnerRoutes = require('./routes/partnerRoutes');
 const privacyPolicyRoutes = require('./routes/privacyPolicyRoutes');
 const termsConditionRoutes = require('./routes/termsConditionRoutes');
 const faqRoutes = require('./routes/faqRoutes');
+const stripeWebhook = require('./routes/stripeWebhook'); 
 
 // Mount routers
 app.use('/api/auth', authRoutes);
@@ -81,6 +82,7 @@ app.use('/api/partners', partnerRoutes);
 app.use('/api/privacy-policy', privacyPolicyRoutes);
 app.use('/api/terms-condition', termsConditionRoutes);
 app.use('/api/faqs', faqRoutes);
+app.use('/api/webhook', express.raw({ type: 'application/json' }), stripeWebhook);
 
 // Custom error handling
 app.use(errorHandler);
