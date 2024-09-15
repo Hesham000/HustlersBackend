@@ -1,71 +1,42 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const Package = require('../models/Package');
-const createCheckoutSession = async (req, res) => {
-    const { packageId, currency = 'aed' } = req.body;
-    const userId = req.user?.id; // Ensure you have the userId from authentication middleware
+require('dotenv').config();  // Load environment variables
 
-    // Validate inputs
-    if (!packageId) {
-        return res.status(400).json({
-            success: false,
-            error: 'PackageId is required.',
-        });
+const Stripe = require('stripe');
+const stripe = Stripe(process.env.STRIPE_SECRET_KEY);  // Use the secret key from .env
+
+/**
+ * Create a Stripe Payment Intent with supported payment methods for the currency
+ * @param {number} amount - The amount in the smallest currency unit (e.g., fils for AED)
+ * @param {string} currency - Currency code, default is AED
+ * @returns {Promise<Object>} Payment intent object from Stripe
+ */
+const createPaymentIntent = async (amount, currency = 'aed') => {
+  try {
+    // Define the supported payment methods based on the currency
+    let paymentMethodTypes = ['card'];  // Cards are globally supported, includes Apple Pay and Google Pay
+
+    // Adjust payment methods based on currency
+    if (currency === 'aed') {
+      // For AED, only card is supported (Apple Pay/Google Pay is automatically included with card)
+      paymentMethodTypes = ['card'];
+    } else if (currency === 'eur') {
+      // For EUR, you can use Bancontact, iDEAL, SEPA, etc.
+      paymentMethodTypes = ['card', 'bancontact', 'ideal', 'sepa_debit', 'sofort'];
+    } else if (currency === 'usd') {
+      // For USD, you can use additional methods like ACH, Alipay, etc.
+      paymentMethodTypes = ['card', 'alipay', 'ach_credit_transfer'];
     }
 
-    try {
-        // Fetch the package from the database
-        const packageData = await Package.findById(packageId);
+    // Create the payment intent with the correct methods based on the currency
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount,  // Amount in the smallest currency unit (e.g., 100 AED = 10000 fils)
+      currency,
+      payment_method_types: paymentMethodTypes,
+    });
 
-        if (!packageData) {
-            return res.status(404).json({
-                success: false,
-                error: 'Package not found.',
-            });
-        }
-
-        // Use priceAfterDiscount or price for the amount
-        const amount = packageData.priceAfterDiscount * 100; // Convert to smallest currency unit (e.g., cents)
-
-        // Create a Checkout Session using Stripe
-        const session = await stripe.checkout.sessions.create({
-            payment_method_types: ['card'], // Specify allowed payment methods
-            line_items: [
-                {
-                    price_data: {
-                        currency,
-                        product_data: {
-                            name: packageData.title, // Use the package title
-                        },
-                        unit_amount: amount, // Amount in smallest currency unit (e.g., cents)
-                    },
-                    quantity: 1,
-                },
-            ],
-            mode: 'payment', // One-time payment mode
-            success_url: `${process.env.FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`, // Redirect here on success
-            cancel_url: `${process.env.FRONTEND_URL}/cancel`, // Redirect here if the user cancels
-            metadata: {
-                packageId, // Include packageId in metadata
-                userId,    // Include userId in metadata
-            },
-        });
-
-        // Respond with the URL of the Checkout Session
-        res.status(200).json({
-            success: true,
-            sessionId: session.id, // Return session ID for the frontend
-            url: session.url,      // Stripe Checkout page URL to redirect the user
-        });
-    } catch (error) {
-        console.error('Error creating checkout session:', error.message);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to create checkout session',
-            details: error.message,
-        });
-    }
+    return paymentIntent;
+  } catch (error) {
+    throw new Error(`Error creating payment intent: ${error.message}`);
+  }
 };
 
-module.exports = {
-    createCheckoutSession,
-};
+module.exports = { createPaymentIntent };

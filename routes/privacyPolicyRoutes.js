@@ -1,16 +1,23 @@
-// routes/privacyPolicyRoutes.js
 const express = require('express');
-const { createPrivacyPolicy, getPrivacyPolicy, updatePrivacyPolicy } = require('../controllers/privacyPolicyController');
-const { protect } = require('../middleware/authMiddleware'); // Assuming you have a protect middleware to restrict access
+const { 
+    createPrivacyPolicy, 
+    getPrivacyPolicy, 
+    getAllPrivacyPolicies, 
+    updatePrivacyPolicy 
+} = require('../controllers/privacyPolicyController');
 
 const router = express.Router();
 
-// Routes for privacy policy management
-router.route('/')
-    .post(protect, createPrivacyPolicy)  // Create a new privacy policy
-    .get(getPrivacyPolicy)               // Get the existing privacy policy
+// Create a new privacy policy
+router.post('/', createPrivacyPolicy);
 
-router.route('/update')
-    .put(protect, updatePrivacyPolicy);   // Update the existing privacy policy
+// Get a single privacy policy
+router.get('/', getAllPrivacyPolicies);
+
+// Get all privacy policies
+router.get('/:id',getPrivacyPolicy);
+
+// Update the privacy policy
+router.put('/', updatePrivacyPolicy);
 
 module.exports = router;

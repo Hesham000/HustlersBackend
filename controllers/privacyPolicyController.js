@@ -1,4 +1,3 @@
-// controllers/privacyPolicyController.js
 const PrivacyPolicy = require('../models/PrivacyPolicy');
 
 // Create Privacy Policy
@@ -19,7 +18,7 @@ exports.createPrivacyPolicy = async (req, res) => {
     }
 };
 
-// Get Privacy Policy
+// Get a single Privacy Policy
 exports.getPrivacyPolicy = async (req, res) => {
     try {
         const policy = await PrivacyPolicy.findOne(); // Assuming there's only one policy
@@ -32,6 +31,28 @@ exports.getPrivacyPolicy = async (req, res) => {
         res.status(200).json({
             success: true,
             data: policy
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            error: err.message
+        });
+    }
+};
+
+// Get all Privacy Policies
+exports.getAllPrivacyPolicies = async (req, res) => {
+    try {
+        const policies = await PrivacyPolicy.find(); // Find all privacy policies
+        if (!policies || policies.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'No privacy policies found'
+            });
+        }
+        res.status(200).json({
+            success: true,
+            data: policies
         });
     } catch (err) {
         res.status(500).json({

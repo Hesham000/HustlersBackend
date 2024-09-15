@@ -1,28 +1,30 @@
 const express = require('express');
-const { protect, restrictTo } = require('../middleware/authMiddleware');
 const {
-    createCheckoutSession,
-    createPayment,
-    getPayments,
-    getPaymentById,
-    updatePaymentStatus,
+  createPayment,
+  getPayments,
+  getPaymentById,
+  handleStripeWebhook
 } = require('../controllers/paymentController');
+const { protect, restrictTo } = require('../middleware/authMiddleware'); // Use protect and restrictTo
 
 const router = express.Router();
 
-// Create a Stripe Checkout session (redirect to Stripe payment page)
-router.post('/create-checkout-session', protect, createCheckoutSession);
+// Route to create a payment
+router.post('/create', protect, createPayment);
 
-// Store payment after confirmation
-router.post('/', protect, createPayment);
+// Route to get all payments for the authenticated user
+router.get('/', protect, getPayments);
 
-// Admin-only route to get all payments
-router.get('/', protect, restrictTo('admin'), getPayments);
+// Route to get a specific payment by ID for the authenticated user
+router.get('/:paymentId', protect, getPaymentById);
 
-// Get a single payment by ID
-router.get('/:id', protect, restrictTo('admin', 'user'), getPaymentById);
+// Webhook for Stripe to update payment status (no auth required for webhooks)
+router.post('/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
 
-// Update payment status (admin)
-router.put('/:id', protect, restrictTo('admin'), updatePaymentStatus);
+// Optionally, you can restrict certain routes to admin users or specific roles.
+// Example: Admin can view all users' payments or cancel payments.
+router.get('/admin/all-payments', protect, restrictTo('admin'), (req, res) => {
+  // Admin route logic here
+});
 
 module.exports = router;

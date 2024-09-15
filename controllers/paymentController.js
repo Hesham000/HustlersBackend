@@ -1,123 +1,135 @@
 const Payment = require('../models/Payment');
 const Package = require('../models/Package');
-const { createCheckoutSession } = require('../services/stripeService');
+const { createPaymentIntent } = require('../services/stripeService');
 
-// Create Stripe Checkout Session (redirects to Stripe's payment page)
-exports.createCheckoutSession = async (req, res) => {
-    const { currency, packageId } = req.body;
+/**
+ * Create a payment and return client secret to the client
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+const createPayment = async (req, res) => {
+  try {
+    const { packageId, paymentMethod } = req.body;
+    const userId = req.user._id;  // Assuming user is authenticated
 
-    try {
-        // Assuming req.user contains authenticated user's info
-        const userId = req.user.id;
-
-        // Fetch the package and ensure it exists
-        const packageData = await Package.findById(packageId);
-        if (!packageData) {
-            return res.status(404).json({
-                success: false,
-                error: 'Package not found.',
-            });
-        }
-
-        // Get the amount from the package price
-        const amount = packageData.priceAfterDiscount * 100; // Convert to smallest currency unit (e.g., cents)
-
-        // Create Stripe Checkout session using the Stripe Service
-        const session = await createCheckoutSession(amount, currency, packageId, userId);
-
-        // Respond with the Stripe Checkout session URL to redirect the user
-        res.status(201).json({
-            success: true,
-            sessionId: session.id,
-            url: session.url, // Stripe Checkout page URL to redirect the user
-        });
-    } catch (error) {
-        console.error('Error creating Stripe Checkout session:', error.message);
-        res.status(500).json({ success: false, error: error.message });
+    // Fetch package details
+    const selectedPackage = await Package.findById(packageId);
+    if (!selectedPackage) {
+      return res.status(404).json({ message: 'Package not found' });
     }
+
+    // Calculate payment amount (in the smallest AED unit)
+    const amount = Math.round(selectedPackage.priceAfterDiscount * 100);
+
+    // Create payment intent using Stripe
+    const paymentIntent = await createPaymentIntent(amount, 'aed');
+
+    // Save payment to MongoDB
+    const payment = new Payment({
+      user: userId,
+      package: packageId,
+      amount: selectedPackage.priceAfterDiscount,
+      status: 'pending',  // Payment starts as pending
+      transactionId: paymentIntent.id,  // Stripe transaction ID
+      paymentMethod,
+    });
+
+    await payment.save();
+
+    // Respond with client secret to the client
+    res.status(201).json({
+      message: 'Payment initiated successfully',
+      clientSecret: paymentIntent.client_secret,
+      paymentId: payment._id,  // Return the payment ID
+    });
+  } catch (error) {
+    console.error('Error creating payment:', error);
+    res.status(500).json({ message: 'Payment creation failed' });
+  }
 };
 
-// Store Payment in the database after the payment is confirmed
-exports.createPayment = async (req, res) => {
-    const { packageId, transactionId, paymentMethod } = req.body;
+/**
+ * Get all payments for the authenticated user
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+const getPayments = async (req, res) => {
+  try {
+    const userId = req.user._id;  // Assuming user is authenticated
 
-    try {
-        // Assuming req.user contains authenticated user's info
-        const userId = req.user.id;
+    // Fetch all payments made by the authenticated user
+    const payments = await Payment.find({ user: userId }).populate('package');  // Populate package info
 
-        // Fetch the package and ensure it exists
-        const packageData = await Package.findById(packageId);
-        if (!packageData) {
-            return res.status(404).json({
-                success: false,
-                error: 'Package not found.',
-            });
-        }
-
-        // Get the amount from the package price
-        const amount = packageData.priceAfterDiscount * 100; // Convert to smallest currency unit (e.g., cents)
-
-        // Create the payment record
-        const payment = await Payment.create({
-            user: userId,
-            package: packageId,
-            amount,
-            status: 'pending', // Status can be updated later after payment confirmation
-            transactionId,
-            paymentMethod,
-        });
-
-        res.status(201).json({ success: true, data: payment });
-    } catch (error) {
-        console.error('Error creating payment:', error.message);
-        res.status(500).json({ success: false, error: 'Server error, please try again later.' });
+    if (!payments || payments.length === 0) {
+      return res.status(404).json({ message: 'No payments found for this user' });
     }
+
+    res.status(200).json(payments);
+  } catch (error) {
+    console.error('Error fetching payments:', error);
+    res.status(500).json({ message: 'Error fetching payments' });
+  }
 };
 
-// Get all payments (admin only)
-exports.getPayments = async (req, res) => {
-    try {
-        const payments = await Payment.find()
-            .populate('user', 'name email')    // Populate the user fields
-            .populate('package', 'title price'); // Populate the package fields
+/**
+ * Get a specific payment by its ID
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+const getPaymentById = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+    const userId = req.user._id;  // Assuming user is authenticated
 
-        res.status(200).json({ success: true, data: payments });
-    } catch (error) {
-        console.error('Error fetching payments:', error.message);
-        res.status(500).json({ success: false, error: error.message });
+    // Find the payment by ID and ensure the payment belongs to the authenticated user
+    const payment = await Payment.findOne({ _id: paymentId, user: userId }).populate('package');
+
+    if (!payment) {
+      return res.status(404).json({ message: 'Payment not found' });
     }
+
+    res.status(200).json(payment);
+  } catch (error) {
+    console.error('Error fetching payment:', error);
+    res.status(500).json({ message: 'Error fetching payment' });
+  }
 };
 
-// Get a single payment by ID
-exports.getPaymentById = async (req, res) => {
-    try {
-        const payment = await Payment.findById(req.params.id)
-            .populate('user', 'name email')    // Populate the user fields
-            .populate('package', 'title price'); // Populate the package fields
+/**
+ * Handle Stripe webhook events
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+const handleStripeWebhook = async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;  // Your webhook secret from Stripe dashboard
 
-        if (!payment) {
-            return res.status(404).json({ success: false, error: 'Payment not found' });
-        }
+  let event;
 
-        res.status(200).json({ success: true, data: payment });
-    } catch (error) {
-        console.error('Error fetching payment:', error.message);
-        res.status(500).json({ success: false, error: error.message });
-    }
+  try {
+    event = stripe.webhooks.constructEvent(req.rawBody, sig, endpointSecret);
+  } catch (err) {
+    console.error('Webhook signature verification failed.', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Handle the event types
+  if (event.type === 'payment_intent.succeeded') {
+    const paymentIntent = event.data.object;
+
+    // Update payment status to 'completed' in MongoDB
+    await Payment.findOneAndUpdate(
+      { transactionId: paymentIntent.id },
+      { status: 'completed' }
+    );
+  }
+
+  res.json({ received: true });
 };
 
-// Update payment status (admin only)
-exports.updatePaymentStatus = async (req, res) => {
-    try {
-        const payment = await Payment.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
-
-        if (!payment) {
-            return res.status(404).json({ success: false, error: 'Payment not found' });
-        }
-
-        res.status(200).json({ success: true, data: payment });
-    } catch (error) {
-        console.error('Error updating payment status:', error.message);
-        res.status(500).json({ success: false, error: error.message });
-    }
+module.exports = {
+  createPayment,
+  getPayments,
+  getPaymentById,
+  handleStripeWebhook,
 };
