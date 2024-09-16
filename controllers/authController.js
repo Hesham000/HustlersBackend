@@ -139,22 +139,32 @@ exports.verifyOtp = async (req, res) => {
 
 // Login User (Email/Password)
 exports.login = async (req, res) => {
-    const { email, password } = req.body;
+    const { email, password, fcmToken } = req.body; // Accept fcmToken in the login request
 
     try {
-        const user = await User.findOne({ email }).select('+password'); // Explicitly select password
+        // Find user by email and include the password in the query result
+        const user = await User.findOne({ email }).select('+password');
 
+        // Check if the user exists and the password matches
         if (!user || !(await user.matchPassword(password))) {
             return res.status(401).json({ success: false, error: 'Invalid credentials' });
         }
 
+        // Check if the user's email is verified
         if (!user.isVerified) {
             return res.status(401).json({ success: false, error: 'Email not verified. Please verify your email.' });
         }
 
-        // Generate token
+        // Update FCM token if provided
+        if (fcmToken) {
+            user.fcmToken = fcmToken;
+            await user.save(); // Save the updated FCM token
+        }
+
+        // Generate JWT token for authentication
         const token = generateToken(user);
 
+        // Return the user details and the JWT token
         res.status(200).json({
             success: true,
             data: {
@@ -163,13 +173,15 @@ exports.login = async (req, res) => {
                 email: user.email,
                 phone: user.phone,
                 role: user.role,
-                token,
+                token, // Send the JWT token to the client
             },
         });
     } catch (err) {
+        // Handle errors during the login process
         res.status(400).json({ success: false, error: err.message });
     }
 };
+
 
 // Logout User
 exports.logout = (req, res) => {
@@ -191,6 +203,9 @@ exports.logout = (req, res) => {
         res.status(400).json({ success: false, error: 'Failed to logout. Please try again.' });
     }
 };
+
+
+
 
 // Google OAuth callback
 exports.googleAuthCallback = (req, res) => {

@@ -1,103 +1,128 @@
-const Notification = require('../models/Notification');
+const Notification = require('../models/Notifications');
 const axios = require('axios');
 const { getAccessToken } = require('../utils/firebaseAuth');
+const getAllUserFCMTokens = require('../utils/getAllUserFCMTokens');
 
 // FCM API URL for Firebase Cloud Messaging
 const FCM_API_URL = process.env.FCM_API_URL;
 
 /**
+
+/**
  * Send a notification to all users via FCM topic
  */
+
 exports.sendNotificationToAll = async (req, res) => {
     const { title, body } = req.body;
 
     try {
-        // Save the notification in MongoDB
-        const notification = await Notification.create({ title, body });
+        // Get all user FCM tokens from the helper function
+        const allFCMTokens = await getAllUserFCMTokens();
 
-        // Get an OAuth token for FCM using your Firebase service account
+        if (!allFCMTokens || allFCMTokens.length === 0) {
+            return res.status(400).json({ message: 'No FCM tokens found to send notifications' });
+        }
+
         const accessToken = await getAccessToken();
 
-        // Create the FCM payload
-        const payload = {
+        // Build the FCM message payload
+        const message = {
             message: {
-                topic: 'all_users',
                 notification: {
-                    title,
-                    body,
+                    title: title,
+                    body: body
                 },
-            },
+                tokens: allFCMTokens, // Use the array of tokens for multicast
+            }
         };
 
-        // Send the notification to FCM
-        const response = await axios.post(FCM_API_URL, payload, {
+        // Send the HTTP request to the FCM API
+        const response = await axios.post(FCM_API_URL, message, {
             headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${accessToken}`,
-            },
+                Authorization: `Bearer ${accessToken}`, // OAuth 2.0 token
+                'Content-Type': 'application/json'
+            }
         });
 
+        // Create notification record in MongoDB
+        const notification = new Notification({
+            title,
+            body,
+            recipient: 'all',
+            sent: true,
+        });
+
+        await notification.save();
+
         res.status(200).json({
-            success: true,
-            message: 'Notification sent to all users successfully',
-            data: notification,
-            fcmResponse: response.data,
+            message: 'Notification sent to all users successfully via FCM API',
+            response: response.data,
         });
     } catch (error) {
-        console.error('Error sending notification:', error);
+        console.error('Error sending notification to all users:', error);
         res.status(500).json({
-            success: false,
-            error: 'Failed to send notification',
+            message: 'Failed to send notification to all users via FCM API',
+            error: error.message,
         });
     }
 };
 
 /**
- * Send a notification to a specific user via FCM Token
+ * Send notification to a specific user via FCM REST API
  */
 exports.sendNotificationToUser = async (req, res) => {
-    const { title, body, fcmToken } = req.body; // fcmToken will be provided by the mobile app
+    const { title, body, fcmToken } = req.body;
 
     try {
-        // Save the notification in MongoDB
-        const notification = await Notification.create({ title, body, user: req.user.id });
+        if (!fcmToken) {
+            return res.status(400).json({ message: 'FCM Token is required for sending to a specific user' });
+        }
 
-        // Get an OAuth token for FCM using your Firebase service account
         const accessToken = await getAccessToken();
 
-        // Create the FCM payload for the specific user
-        const payload = {
+        // Build the FCM message payload
+        const message = {
             message: {
-                token: fcmToken,
                 notification: {
-                    title,
-                    body,
+                    title: title,
+                    body: body,
                 },
-            },
+                token: fcmToken, // Single user's FCM token
+            }
         };
 
-        // Send the notification to FCM
-        const response = await axios.post(FCM_API_URL, payload, {
+        // Send the HTTP request to the FCM API
+        const response = await axios.post(FCM_API_URL, message, {
             headers: {
+                Authorization: `Bearer ${accessToken}`, // Use the OAuth 2.0 token
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${accessToken}`,
-            },
+            }
         });
 
+        // Save the notification in MongoDB
+        const notification = new Notification({
+            title,
+            body,
+            recipient: 'user', // Replace with actual user ID if available
+            fcmToken,
+            sent: true,
+        });
+
+        await notification.save();
+
         res.status(200).json({
-            success: true,
-            message: `Notification sent to user with token: ${fcmToken}`,
-            data: notification,
-            fcmResponse: response.data,
+            message: 'Notification sent to the user successfully via FCM API',
+            response: response.data,
         });
     } catch (error) {
-        console.error('Error sending notification:', error);
+        console.error('Error sending notification to user via FCM API:', error);
         res.status(500).json({
-            success: false,
-            error: 'Failed to send notification',
+            message: 'Failed to send notification to the user via FCM API',
+            error: error.message,
         });
     }
 };
+
 
 /**
  * Get all notifications

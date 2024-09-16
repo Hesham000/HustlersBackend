@@ -1,4 +1,3 @@
-// routes/notificationRoutes.js
 const express = require('express');
 const {
     sendNotificationToAll,
@@ -15,10 +14,10 @@ const router = express.Router();
 // Routes for notifications
 
 // POST: Send a notification to all users
-router.post('/send/all', protect, restrictTo('admin'), sendNotificationToAll);
+router.post('/send/all', protect, sendNotificationToAll);
 
 // POST: Send a notification to a specific user via FCM token
-router.post('/send/user', protect, restrictTo('admin'), sendNotificationToUser);
+router.post('/send/user', protect, sendNotificationToUser);
 
 // GET: Get all notifications
 router.get('/', protect, getAllNotifications);
@@ -31,5 +30,6 @@ router.put('/:id', protect, restrictTo('admin'), updateNotification);
 
 // DELETE: Delete a notification by ID
 router.delete('/:id', protect, restrictTo('admin'), deleteNotification);
+
 
 module.exports = router;

@@ -37,6 +37,10 @@ const UserSchema = new mongoose.Schema({
         required: true, 
         match: [/^\+?[1-9]\d{1,14}$/, 'Please provide a valid phone number']
     },
+    fcmToken: {
+        type: String,  // FCM token for sending push notifications
+        default: null,
+    },
     isVerified: { 
         type: Boolean, 
         default: false 
@@ -59,6 +63,7 @@ const UserSchema = new mongoose.Schema({
     },
 });
 
+// Hash password before saving
 UserSchema.pre('save', async function(next) {
     if (!this.isModified('password')) {
         return next();
@@ -69,10 +74,12 @@ UserSchema.pre('save', async function(next) {
     next();
 });
 
+// Match user password
 UserSchema.methods.matchPassword = async function(enteredPassword) {
     return await bcrypt.compare(enteredPassword, this.password);
 };
 
+// Generate OTP for user verification
 UserSchema.methods.generateOTP = function() {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     this.otp = otp;
@@ -80,6 +87,7 @@ UserSchema.methods.generateOTP = function() {
     return otp;
 };
 
+// Verify OTP
 UserSchema.methods.verifyOTP = function(enteredOtp) {
     return this.otp === enteredOtp && Date.now() < this.otpExpires;
 };
