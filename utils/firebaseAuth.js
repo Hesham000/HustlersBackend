@@ -1,27 +1,25 @@
+// firebaseAuth.js
 const admin = require('firebase-admin');
-const path = require('path');
+const serviceAccount = require('../serviceAccountKey.json');
+const { google } = require('googleapis');
 
-// Path to your Firebase service account key
-const serviceAccount = require(path.join(__dirname, '../serviceAccountKey.json'));
-
-// Initialize Firebase Admin SDK with the service account key
+// Initialize Firebase Admin SDK
 admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount), // Use the service account key
+  credential: admin.credential.cert(serviceAccount),
 });
 
-/**
- * Function to get access token for FCM
- */
+// Function to get the access token
 const getAccessToken = async () => {
-    try {
-        const accessToken = await admin.credential.cert(serviceAccount).getAccessToken();
-        return accessToken.access_token;
-    } catch (error) {
-        console.error('Error getting Firebase access token:', error);
-        throw new Error('Failed to get Firebase access token');
-    }
+  const auth = new google.auth.GoogleAuth({
+    credentials: serviceAccount,
+    scopes: ['https://www.googleapis.com/auth/firebase.messaging'],
+  });
+
+  const authToken = await auth.getAccessToken();
+  return authToken.token;
 };
 
 module.exports = {
-    getAccessToken,
+  admin,
+  getAccessToken,
 };

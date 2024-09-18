@@ -1,35 +1,24 @@
+// routes/notificationRoutes.js
 const express = require('express');
-const {
-    sendNotificationToAll,
-    sendNotificationToUser,
-    getAllNotifications,
-    getNotificationById,
-    updateNotification,
-    deleteNotification,
-} = require('../controllers/notificationController');
-const { protect, restrictTo } = require('../middleware/authMiddleware'); // Middleware for authentication and role restriction
-
 const router = express.Router();
+const notificationController = require('../controllers/notificationsController');
 
-// Routes for notifications
+// Create notification
+router.post('/', notificationController.createNotification);
 
-// POST: Send a notification to all users
-router.post('/send/all', protect, sendNotificationToAll);
+// Get all notifications
+router.get('/', notificationController.getNotifications);
 
-// POST: Send a notification to a specific user via FCM token
-router.post('/send/user', protect, sendNotificationToUser);
+// Update a notification
+router.put('/:id', notificationController.updateNotification);
 
-// GET: Get all notifications
-router.get('/', protect, getAllNotifications);
+// Delete a notification
+router.delete('/:id', notificationController.deleteNotification);
 
-// GET: Get a specific notification by ID
-router.get('/:id', protect, getNotificationById);
+// Send notification to all users
+router.post('/send/all', notificationController.sendNotificationToAll);
 
-// PUT: Update a notification by ID
-router.put('/:id', protect, restrictTo('admin'), updateNotification);
-
-// DELETE: Delete a notification by ID
-router.delete('/:id', protect, restrictTo('admin'), deleteNotification);
-
+// Send notification to a specific user
+router.post('/send/:userId', notificationController.sendNotificationToUser);
 
 module.exports = router;
