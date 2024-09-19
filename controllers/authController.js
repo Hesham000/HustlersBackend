@@ -203,8 +203,80 @@ exports.logout = (req, res) => {
         res.status(400).json({ success: false, error: 'Failed to logout. Please try again.' });
     }
 };
+//fORGET PASSWORD
+exports.requestPasswordReset = async (req, res) => {
+    const { email } = req.body;
 
+    try {
+        // Check if the user exists
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: 'User with this email does not exist',
+            });
+        }
 
+        // Generate OTP and update the user
+        const otp = generateOtp();
+        user.otp = otp;
+        user.otpExpires = Date.now() + 10 * 60 * 1000; // OTP expires in 10 minutes
+        await user.save();
+
+        // Send OTP via email
+        await sendVerificationOtp(email, otp);
+
+        res.status(200).json({
+            success: true,
+            message: 'OTP sent to your email for password reset.',
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: 'Something went wrong, please try again later.',
+        });
+    }
+};
+
+// Reset Password
+exports.resetPassword = async (req, res) => {
+    const { email, otp, newPassword } = req.body;
+
+    try {
+        // Find the user by email
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: 'User with this email does not exist',
+            });
+        }
+
+        // Verify the OTP
+        if (!user.verifyOTP(otp)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid or expired OTP',
+            });
+        }
+
+        // Update the password
+        user.password = newPassword;
+        user.otp = undefined; // Clear the OTP
+        user.otpExpires = undefined; // Clear the OTP expiry
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Password reset successfully. You can now log in with your new password.',
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: 'Something went wrong, please try again later.',
+        });
+    }
+};
 
 
 // Google OAuth callback
