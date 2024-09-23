@@ -1,25 +1,18 @@
-// firebaseAuth.js
 const admin = require('firebase-admin');
-const serviceAccount = require('../serviceAccountKey.json');
-const { google } = require('googleapis');
+
+// Parse the service account key from the environment variable
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
 // Initialize Firebase Admin SDK
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
-
-// Function to get the access token
-const getAccessToken = async () => {
-  const auth = new google.auth.GoogleAuth({
-    credentials: serviceAccount,
-    scopes: ['https://www.googleapis.com/auth/firebase.messaging'],
+try {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
   });
-
-  const authToken = await auth.getAccessToken();
-  return authToken.token;
-};
+  console.log('Firebase Admin initialized successfully');
+} catch (error) {
+  console.error('Error initializing Firebase Admin:', error.message);
+}
 
 module.exports = {
   admin,
-  getAccessToken,
 };

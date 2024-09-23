@@ -1,11 +1,6 @@
-// controllers/notificationController.js
 const Notification = require('../models/Notification');
 const User = require('../models/User');
-const axios = require('axios');
-const { getAccessToken } = require('../utils/firebaseAuth');
-
-// Firebase FCM endpoint from your .env
-const FCM_API_URL = process.env.FCM_API_URL;
+const { admin } = require('../utils/firebaseAuth');
 
 // Create a notification and save to MongoDB
 exports.createNotification = async (req, res) => {
@@ -15,7 +10,7 @@ exports.createNotification = async (req, res) => {
     await notification.save();
     res.status(201).json(notification);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create notification' });
+    res.status(500).json({ error: 'Failed to create notification', details: error.message });
   }
 };
 
@@ -27,35 +22,23 @@ exports.sendNotificationToAll = async (req, res) => {
 
     const { title, body } = req.body;
 
-    // Get the access token
-    const accessToken = await getAccessToken();
-
     // Construct the message payload
     const message = {
-      message: {
-        notification: {
-          title,
-          body,
-        },
-        tokens: fcmTokens, // Array of FCM tokens
+      notification: {
+        title,
+        body,
       },
+      tokens: fcmTokens, // Array of FCM tokens
     };
 
-    // Send the notification via FCM API
-    const response = await axios.post(
-      FCM_API_URL,
-      message,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    // Send notification via Firebase Admin SDK
+    const response = await admin.messaging().sendMulticast(message);
+    console.log('FCM response:', response);
 
-    res.status(200).json({ success: true, response: response.data });
+    res.status(200).json({ success: true, response });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to send notifications to all users' });
+    console.error('Failed to send notifications:', error.message);
+    res.status(500).json({ error: 'Failed to send notifications to all users', details: error.message });
   }
 };
 
@@ -71,35 +54,23 @@ exports.sendNotificationToUser = async (req, res) => {
 
     const { title, body } = req.body;
 
-    // Get the access token
-    const accessToken = await getAccessToken();
-
     // Construct the message payload
     const message = {
-      message: {
-        notification: {
-          title,
-          body,
-        },
-        token: user.fcmToken,
+      notification: {
+        title,
+        body,
       },
+      token: user.fcmToken, // Send to individual token
     };
 
-    // Send the notification via FCM API
-    const response = await axios.post(
-      FCM_API_URL,
-      message,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    // Send notification via Firebase Admin SDK
+    const response = await admin.messaging().send(message);
+    console.log('FCM response:', response);
 
-    res.status(200).json({ success: true, response: response.data });
+    res.status(200).json({ success: true, response });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to send notification to user' });
+    console.error('Failed to send notification:', error.message);
+    res.status(500).json({ error: 'Failed to send notification to user', details: error.message });
   }
 };
 
@@ -109,7 +80,7 @@ exports.getNotifications = async (req, res) => {
     const notifications = await Notification.find();
     res.status(200).json(notifications);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to get notifications' });
+    res.status(500).json({ error: 'Failed to get notifications', details: error.message });
   }
 };
 
@@ -127,7 +98,7 @@ exports.updateNotification = async (req, res) => {
 
     res.status(200).json(updatedNotification);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update notification' });
+    res.status(500).json({ error: 'Failed to update notification', details: error.message });
   }
 };
 
@@ -138,6 +109,6 @@ exports.deleteNotification = async (req, res) => {
     await Notification.findByIdAndDelete(id);
     res.status(200).json({ message: 'Notification deleted' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete notification' });
+    res.status(500).json({ error: 'Failed to delete notification', details: error.message });
   }
 };
