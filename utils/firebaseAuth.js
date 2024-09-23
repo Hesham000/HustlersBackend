@@ -1,10 +1,12 @@
 const admin = require('firebase-admin');
-const serviceAccount = require('/etc/secrets/serviceAccountKey.json');
 
-// Initialize Firebase Admin SDK
+// Path to the serviceAccountKey.json secret file stored on Render
+const serviceAccountPath = '/etc/secrets/serviceAccountKey.json';
+
 try {
+  // Initialize Firebase Admin SDK using the serviceAccountKey.json file
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
+    credential: admin.credential.cert(require(serviceAccountPath)),
   });
   console.log('Firebase Admin initialized successfully');
 } catch (error) {
