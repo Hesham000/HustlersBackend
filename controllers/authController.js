@@ -119,8 +119,8 @@ exports.verifyOtp = async (req, res) => {
         res.status(200).json({
             success: true,
             message: 'Email successfully verified. You are now logged in.',
-            token: token,
-            userData: {
+            data: {
+                token: token,
                 _id: user._id,
                 name: user.name,
                 email: user.email,
