@@ -1,5 +1,4 @@
 const User = require('../models/User');
-const Payment = require('../models/Payment');
 const Package = require('../models/Package');
 
 // Get analytics data
