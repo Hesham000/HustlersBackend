@@ -1,10 +1,11 @@
 const express = require('express');
 const { getAnalytics } = require('../controllers/analyticsController');
-const { protect, restrictTo } = require('../middleware/authMiddleware'); // Assuming you have this middleware
+const { protect, restrictTo } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-// Protect this route so that only admins can access analytics
+// Route to get analytics data
+// Only admins should have access to analytics, so we'll restrict this route
 router.get('/', protect, restrictTo('admin'), getAnalytics);
 
 module.exports = router;

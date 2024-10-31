@@ -1,62 +1,52 @@
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
-const User = require('../models/User');
-const jwt = require('jsonwebtoken');
+const User = require('../models/User'); // Import User model
 
-// Load environment variables
-require('dotenv').config();
-
-// Helper function to generate JWT token
-const generateJwtToken = (userId) => {
-    return jwt.sign(
-        { id: userId },
-        process.env.JWT_SECRET,
-        { expiresIn: '30d' } // Token expires in 30 days
-    );
-};
-
-// Configure the Google OAuth strategy
 passport.use(
-    new GoogleStrategy(
-        {
-            clientID: process.env.GOOGLE_CLIENT_ID,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-            callbackURL: process.env.GOOGLE_CALLBACK_URL,
-        },
-        async (accessToken, refreshToken, profile, done) => {
-            try {
-                let user = await User.findOne({ googleId: profile.id });
+  new GoogleStrategy(
+    {
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: `${process.env.BACKEND_URL}/api/auth/google/callback`,
+    },
+    async (accessToken, refreshToken, profile, done) => {
+      try {
+        // Check if the user already exists in the database
+        let user = await User.findOne({ email: profile.emails[0].value });
 
-                if (user) {
-                    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
-                    return done(null, { user, token });
-                }
+        if (user) {
+          // User exists, proceed with authentication
+          return done(null, user);
+        } else {
+          // User doesn't exist, create a new one
+          user = new User({
+            googleId: profile.id,           // Storing the Google ID
+            name: profile.displayName,
+            email: profile.emails[0].value,
+            password: null,                 // Google users won't have a password
+            isVerified: true,               // Automatically verify Google users
+            image: profile.photos[0].value, // Google profile image
+          });
 
-                user = await User.create({
-                    googleId: profile.id,
-                    email: profile.emails[0].value,
-                    name: profile.displayName,
-                    isVerified: true,
-                });
-
-                const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
-                return done(null, { user, token });
-            } catch (err) {
-                return done(err, false);
-            }
+          await user.save();
+          return done(null, user);
         }
-    )
+      } catch (err) {
+        return done(err, false);
+      }
+    }
+  )
 );
 
-
-// Serialize user information into the session
-passport.serializeUser((data, done) => {
-    done(null, data);
+passport.serializeUser((user, done) => {
+  done(null, user.id);
 });
 
-// Deserialize user information from the session
-passport.deserializeUser((obj, done) => {
-    done(null, obj);
+passport.deserializeUser(async (id, done) => {
+  try {
+    const user = await User.findById(id);
+    done(null, user);
+  } catch (err) {
+    done(err, null);
+  }
 });
-
-module.exports = passport;

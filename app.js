@@ -70,6 +70,8 @@ const termsConditionRoutes = require('./routes/termsConditionRoutes');
 const faqRoutes = require('./routes/faqRoutes');
 const stripeWebhook = require('./routes/stripeWebhook');
 const notificationRoutes = require('./routes/notificationRoutes');
+const orderRoutes = require('./routes/orderRoutes');
+const calendlyRoutes = require('./routes/calendlyRoutes');
 
 // Mount routers
 app.use('/api/auth', authRoutes);
@@ -85,6 +87,8 @@ app.use('/api/terms-condition', termsConditionRoutes);
 app.use('/api/faqs', faqRoutes);
 app.use('/api/webhook', express.raw({ type: 'application/json' }), stripeWebhook);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/calendly', calendlyRoutes);
 
 // Custom error handling
 app.use(errorHandler);
