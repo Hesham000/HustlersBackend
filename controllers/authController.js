@@ -206,8 +206,6 @@ exports.logout = (req, res) => {
   }
 };
 
-
-
 // Forget Password
 exports.requestPasswordReset = async (req, res) => {
   const { email } = req.body;
