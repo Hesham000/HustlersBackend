@@ -69,7 +69,9 @@ const privacyPolicyRoutes = require('./routes/privacyPolicyRoutes');
 const termsConditionRoutes = require('./routes/termsConditionRoutes');
 const faqRoutes = require('./routes/faqRoutes');
 const stripeWebhook = require('./routes/stripeWebhook');
+const orderRoutes = require('./routes/orderRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const calendlyRoutes = require('./routes/calendlyRoutes');
 
 // Mount routers
 app.use('/api/auth', authRoutes);
@@ -83,6 +85,8 @@ app.use('/api/partners', partnerRoutes);
 app.use('/api/privacy-policy', privacyPolicyRoutes);
 app.use('/api/terms-condition', termsConditionRoutes);
 app.use('/api/faqs', faqRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/calendly', calendlyRoutes);
 app.use('/api/webhook', express.raw({ type: 'application/json' }), stripeWebhook);
 app.use('/api/notifications', notificationRoutes);
 
